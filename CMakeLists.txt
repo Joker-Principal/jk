@@ -22,6 +22,11 @@ set(sources)
 set(link_libs)
 set(definitions)
 
+## meta
+list(APPEND sources 
+    meta/compiler.h
+)
+
 ## add library
 set(source_paths)
 foreach(source IN LISTS sources)
