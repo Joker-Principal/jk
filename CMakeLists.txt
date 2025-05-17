@@ -17,10 +17,36 @@ find_package(asio CONFIG QUIET)
 find_package(range-v3 CONFIG QUIET)
 find_package(fftw3 CONFIG QUIET)
 
+### create target
 set(sources)
 set(link_libs)
 set(definitions)
 
+## add library
+set(source_paths)
+foreach(source IN LISTS sources)
+	list(APPEND source_paths "include/jk/${source}")
+endforeach()
+
+add_library(kit INTERFACE)
+add_library(joker::kit ALIAS kit)
+
+target_sources(kit INTERFACE
+	FILE_SET jk_file_set
+	TYPE HEADERS
+	BASE_DIRS include
+	FILES ${source_paths}
+)
+
+target_include_directories(kit INTERFACE
+    "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+)
+
+target_link_libraries(kit INTERFACE ${link_libs})
+
+target_compile_definitions(kit INTERFACE ${definitions})
+
+### tests
 if(DEFINED JK_BUILD_TESTING)
     set(BUILD_TESTING ${JK_BUILD_TESTING})
 endif()
