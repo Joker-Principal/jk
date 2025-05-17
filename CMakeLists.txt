@@ -25,6 +25,7 @@ set(definitions)
 ## meta
 list(APPEND sources 
     meta/compiler.h
+    meta/type-list.h
 )
 
 ## add library
