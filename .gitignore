@@ -1,0 +1,28 @@
+# clangd
+.cache/*
+
+# CMake
+CMakeUserPresets.json
+
+# VS Code
+.vscode/*
+.VSCodeCounter/*
+**/.qmlls.ini
+
+# Qt Creator
+CMakeLists.txt.user*
+**.autosave
+
+# Visual Studio
+.vs/*
+CMakeSettings.json
+
+# artificials
+build/
+install/
+out/
+__pycache__
+
+# vcpkg
+buildsystem/overlays/*
+vcpkg-configuration.json

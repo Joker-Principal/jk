@@ -1,0 +1,72 @@
+{
+    "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+    "name": "jk",
+    "description": "Joker's C++ Kit",
+    "license": "MIT",
+    "features": {
+        "qt-core": {
+            "description": "Qt Core support",
+            "dependencies": [
+                "qtbase"
+            ]
+        },
+        "qt-widgets": {
+            "description": "Qt GUI support",
+            "dependencies": [
+                {
+                    "name": "qtbase",
+                    "features": [
+                        "widgets"
+                    ]
+                }
+            ]
+        },
+        "qt-sqlite3": {
+            "description": "Qt SQLite3 support",
+            "dependencies": [
+                {
+                    "name": "qtbase",
+                    "features": [
+                        "sql-sqlite"
+                    ]
+                }
+            ]
+        },
+        "fmt": {
+            "description": "fmt support",
+            "dependencies": [
+                "fmt"
+            ]
+        },
+        "nlohmann-json": {
+            "description": "nlohmann-json support",
+            "dependencies": [
+                "nlohmann-json"
+            ]
+        },
+        "protobuf": {
+            "description": "protobuf support",
+            "dependencies": [
+                "protobuf"
+            ]
+        },
+        "asio": {
+            "description": "asio support",
+            "dependencies": [
+                "asio"
+            ]
+        },
+        "range-v3": {
+            "description": "range-v3 support",
+            "dependencies": [
+                "range-v3"
+            ]
+        },
+        "fftw3": {
+            "description": "fftw3 support",
+            "dependencies": [
+                "fftw3"
+            ]
+        }
+    }
+}
