@@ -9,6 +9,7 @@ include(GNUInstallDirs)
 include(CTest)
 include(FeatureSummary)
 
+### dependencies
 find_package(Qt6 QUIET COMPONENTS Core Widgets Sql Xml)
 find_package(fmt CONFIG QUIET)
 find_package(nlohmann_json CONFIG QUIET)
@@ -21,11 +22,19 @@ find_package(fftw3 CONFIG QUIET)
 set(sources)
 set(link_libs)
 set(definitions)
+set(compile_options)
 
 ## meta
 list(APPEND sources 
     meta/compiler.h
     meta/type-list.h
+)
+
+list(APPEND compile_options
+    # make MSVC preprocessor conformant to C++ standard
+    # https://devblogs.microsoft.com/cppblog/announcing-full-support-for-a-c-c-conformant-preprocessor-in-msvc/
+    # https://learn.microsoft.com/en-us/cpp/build/reference/zc-preprocessor?view=msvc-170
+    "$<$<CXX_COMPILER_ID:MSVC>:/Zc:preprocessor>"
 )
 
 ## add library
@@ -51,6 +60,8 @@ target_include_directories(kit INTERFACE
 target_link_libraries(kit INTERFACE ${link_libs})
 
 target_compile_definitions(kit INTERFACE ${definitions})
+
+target_compile_options(kit INTERFACE ${compile_options})
 
 ### tests
 if(DEFINED JK_BUILD_TESTING)
