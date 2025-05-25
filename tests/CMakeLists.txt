@@ -19,3 +19,4 @@ function(add_ctest_task name)
 endfunction()
 
 add_ctest_task(test_type_list type-list.cpp)
+add_ctest_task(test_callables callables.cpp)

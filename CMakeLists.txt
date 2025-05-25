@@ -28,6 +28,7 @@ set(compile_options)
 list(APPEND sources 
     meta/compiler.h
     meta/type-list.h
+    meta/callables.h
 )
 
 list(APPEND compile_options
