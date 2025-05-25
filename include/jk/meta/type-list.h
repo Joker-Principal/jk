@@ -2,7 +2,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace JK::Meta::Details
+namespace JK::Meta::Details::TLists
 {
 /// variadic type list
 template<typename... Ts> struct TList;
@@ -261,7 +261,7 @@ struct TListBase
 	constexpr TListBase(TListBase&&) noexcept = default;
 	constexpr TListBase& operator=(TListBase&&) & noexcept = default;
 	constexpr ~TListBase() noexcept = default;
-	
+
 	static constexpr auto size = SizeConstant<sizeof...(Ts)>{};
 
 	static constexpr auto empty = std::bool_constant<sizeof...(Ts) == 0>{};
@@ -310,17 +310,17 @@ struct TListBase
 	template<typename Tx>
 	using Remove = RemoveIf<IsSameTrait<Tx>::template IsSame>;
 
-	static constexpr auto npos = Details::npos;
+	static constexpr auto npos = Details::TLists::npos;
 
 	// TList<T0, T1, T2, T1, T0>::find<T1> => 1
 	// TList<T0, T1, T2, T1, T0>::find<T3> => npos
 	template<typename T>
-	static constexpr auto find = SizeConstant<Details::findFirst<T, Ts...>()>{};
+	static constexpr auto find = SizeConstant<Details::TLists::findFirst<T, Ts...>()>{};
 
 	// TList<T0, T1, T2, T1, T0>::find<T1> => 3
 	// TList<T0, T1, T2, T1, T0>::find<T3> => npos
 	template<typename T>
-	static constexpr auto findLast = SizeConstant<Details::findLast<T, Ts...>()>{};
+	static constexpr auto findLast = SizeConstant<Details::TLists::findLast<T, Ts...>()>{};
 
 	template<typename T>
 	static constexpr auto contains = std::bool_constant<find<T>() != npos>{};
@@ -484,17 +484,17 @@ using Unite = typename UniteTrait<Lists...>::type;
 
 namespace JK::Meta
 {
-using Details::TList;
+using Details::TLists::TList;
 
 /// Merge<T1, TList<T2, T3, T4>, TList<T5, T6>> => TList<T1, T2, T3, T4, T5, T6>
-using Details::Merge;
+using Details::TLists::Merge;
 
 /// any_template<T1, T2, T3, ...> => TList<T1, T2, T3, ...>
-using Details::From;
+using Details::TLists::From;
 
 /// Zip<TList<T1, T2, T3>, TList<T4, T5, T6>> => TList<TList<T1, T4>, TList<T2, T5>, TList<T3, T6>>
-using Details::Zip;
+using Details::TLists::Zip;
 
 /// Unite<TList<T1, T2, T3>, TList<T1, T2, T4>> => TList<T1, T2, T3, T4>
-using Details::Unite;
+using Details::TLists::Unite;
 }
