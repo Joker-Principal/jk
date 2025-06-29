@@ -18,11 +18,11 @@ CMakeLists.txt.user*
 CMakeSettings.json
 
 # artificials
-build/
-install/
-out/
+/build/
+/install/
+/out/
 __pycache__
 
 # vcpkg
-buildsystem/overlays/*
+/buildsystem/overlays/*
 vcpkg-configuration.json
