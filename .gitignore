@@ -1,6 +1,9 @@
 # clangd
 .cache/*
 
+# clice
+.clice/*
+
 # CMake
 CMakeUserPresets.json
 
