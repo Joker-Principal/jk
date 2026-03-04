@@ -408,24 +408,21 @@ inline constexpr auto creator = [](auto&&... args) -> T* {
 		return new T{std::forward<decltype(args)>(args)...};
 };
 
-struct Apply
+template<typename F>
+constexpr auto unary(F&& f)
 {
-	template<typename F>
-	constexpr auto operator()(F&& f) const
-	{
-		return [fx = std::forward<F>(f)](auto&& tuple) mutable {
-			return std::apply(std::forward<F>(fx), std::forward<decltype(tuple)>(tuple));
-		};
-	}
+	return [fx = std::forward<F>(f)](auto&& tuple) mutable {
+		return std::apply(std::forward<F>(fx), std::forward<decltype(tuple)>(tuple));
+	};
+}
 
-	template<typename F>
-	friend constexpr auto operator|(F&& f, const Apply& apply)
-	{
-		return apply(std::forward<F>(f));
-	}
-};
-
-inline constexpr Apply apply;
+template<auto f>
+constexpr auto unary(CallableOf<f>)
+{
+	return [](auto&& tuple) {
+		return std::apply(f, std::forward<decltype(tuple)>(tuple));
+	};
+}
 
 template<typename C>
 struct IsMemberOf
@@ -613,8 +610,8 @@ using Details::Callables::FunctionRef;
 using Details::Callables::constructor;
 using Details::Callables::creator;
 
-/// [](auto&&...) { ... } | apply => [](auto&& tuple) { ... }
-using Details::Callables::apply;
+/// unary([](auto&&... args) { ... }) => [](auto&& tuple) { ... }
+using Details::Callables::unary;
 
 /// struct A { int foo(int); };
 /// struct B { int bar(int); };
