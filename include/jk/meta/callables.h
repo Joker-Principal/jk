@@ -20,12 +20,17 @@ using FunctorType = typename IsFunctor<std::decay_t<F>>::type;
 template<bool variadic, bool nothrow, typename T, typename R, typename... Args>
 struct CallableImpl
 {
+	static constexpr bool isVariadic = variadic;
+	static constexpr bool isNothrow = nothrow;
+
 	using Class = T;
 	using Return = R;
 	using Arguments = TList<Args...>;
-	using Invoker = std::conditional_t<!variadic, R(Args...) noexcept(nothrow), R(Args..., ...) noexcept(nothrow)>;
-	static constexpr bool isVariadic = variadic;
-	static constexpr bool isNothrow = nothrow;
+	using Invoker = std::conditional_t<
+		!variadic,
+		R(Args...) noexcept(nothrow),
+		R(Args..., ...) noexcept(nothrow)
+	>;
 
 	template<template<typename Rx, typename... Ax> typename E>
 	using Expand = E<R, Args...>;
@@ -115,6 +120,9 @@ struct CallableOf : Callable<decltype(f)>
 {
 	static constexpr auto function = f;
 };
+
+template<auto f>
+inline constexpr auto callableOf = CallableOf<f>{};
 
 template<auto f> using ReturnOf    = typename CallableOf<f>::Return;
 template<auto f> using ClassOf     = typename CallableOf<f>::Class;
@@ -220,13 +228,20 @@ Visitor(Vi&&...) -> Visitor<std::remove_pointer_t<std::decay_t<Vi>>...>;
 
 template<typename F, typename... Args>
 constexpr auto curry(F&& f, Args&&... args1)
+	noexcept(noexcept(std::make_tuple(std::forward<F>(f), std::forward<Args>(args1)...)))
 {
+#if __cpp_init_captures < 201803L
 	// https://stackoverflow.com/a/49902823
 	return [fx = std::forward<F>(f), args1x = std::make_tuple(std::forward<Args>(args1)...)](auto&&... args2) mutable {
 		return std::apply([&](auto&&... args1y) {
 			return std::invoke(std::forward<F>(fx), std::forward<Args>(args1y)..., std::forward<decltype(args2)>(args2)...);
 		}, std::move(args1x));
 	};
+#else
+	return [fx = std::forward<F>(f), ...args1x = std::forward<Args>(args1)](auto&&... args2) mutable {
+		return std::invoke(fx, std::forward<Args>(args1x)..., std::forward<decltype(args2)>(args2)...);
+	};
+#endif
 }
 
 template<typename T> struct RefTrait { using type = T&; };
@@ -427,16 +442,59 @@ template<typename Func, typename C>
 concept MemberOf = IsMemberOf<C>::template value<Func>;
 #endif
 
+/// A lazy generator that will only call the function when needed
+template<typename F, std::enable_if_t<std::is_invocable_v<F>, int> = 0>
+class Lazy
+{
+public:
+	template<typename Fi>
+	constexpr Lazy(Fi&& func) : generator(std::forward<Fi>(func)) {}
+
+	/// call generator when this object is used in a context that requires a value
+    constexpr operator decltype(auto)() noexcept(noexcept(generator())) { return generator(); }
+    constexpr operator decltype(auto)() const noexcept(noexcept(generator())) { return generator(); }
+
+	/// explicitly call the generator to get the value
+    constexpr decltype(auto) operator()() noexcept(noexcept(generator())) { return generator(); }
+    constexpr decltype(auto) operator()() const noexcept(noexcept(generator())) { return generator(); }
+
+private:
+	F generator;
+};
+
+template<typename F> Lazy(F&&) -> Lazy<std::decay_t<F>>;
+
+struct UseInitializerList
+{
+	constexpr explicit UseInitializerList() noexcept = default;
+} inline constexpr useInit;
+
+template<typename T, typename... Args>
+constexpr auto lazy(Args&&... args)
+{
+	return Lazy([as = std::forward_as_tuple(std::forward<Args>(args)...)]() mutable {
+		return std::apply([](auto&&... as) { return T(std::forward<decltype(as)>(as)...); }, std::move(as));
+	});
+}
+
+template<typename T, typename... Args>
+constexpr auto lazy(UseInitializerList, Args&&... args)
+{
+	return Lazy([as = std::forward_as_tuple(std::forward<Args>(args)...)]() mutable {
+		return std::apply([](auto&&... as) { return T{std::forward<decltype(as)>(as)...}; }, std::move(as));
+	});
+}
 } // namespace Callables::Detail
 
 namespace JK::Meta
 {
 /// using F = double (T::*)(int, char);
 /// template<typename R, typename... As> struct MyTemplate;
-/// using V = Callable<>Expand<F, MyTemplate>; // V == MyTemplate<double, int, char>
+/// using V = Callable<F>::Expand<MyTemplate>; // V == MyTemplate<double, int, char>
 using Details::Callables::Callable;
 
 using Details::Callables::CallableOf;
+using Details::Callables::callableOf;
 
 /// using F = double (T::*)(int, char);
 /// using V = FunctorReturn<F>; // V == double
@@ -570,4 +628,18 @@ using Details::Callables::IsMemberOf;
 /// X<decltype(&B::bar)> x; // error: no matching template
 using Details::Callables::MemberOf;
 #endif
+
+using Details::Callables::UseInitializerList;
+using Details::Callables::useInit;
+
+/// struct Value {
+/// 	Value(std::string);
+///     Value(std::initializer_list<int>);
+/// };
+/// std::map<int, Value> m;
+/// m.try_emplace(0, "str"); // m[0] == Value{"str"}
+/// m.try_emplace(1, Lazy([] { return Value("str2"); })); // m[1] == Value("str2")
+/// m.try_emplace(2, lazy<Value>(useInit, 3, 4)); // m[2] == Value{3, 4}
+using Details::Callables::Lazy;
+using Details::Callables::lazy;
 }
