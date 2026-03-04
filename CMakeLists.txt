@@ -64,6 +64,12 @@ target_compile_definitions(kit INTERFACE ${definitions})
 
 target_compile_options(kit INTERFACE ${compile_options})
 
+install(TARGETS kit 
+    EXPORT jkTargets
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILE_SET jk_file_set
+)
+
 ### tests
 if(DEFINED JK_BUILD_TESTING)
     set(BUILD_TESTING ${JK_BUILD_TESTING})
@@ -75,3 +81,31 @@ add_feature_info(Testing JK_BUILD_TESTING "Build jk tests")
 if(BUILD_TESTING)
 	add_subdirectory(tests)
 endif()
+
+### package
+include(CMakePackageConfigHelpers)
+
+install(EXPORT jkTargets
+    FILE jkTargets.cmake
+    NAMESPACE joker::
+    DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/jk/cmake"
+)
+
+write_basic_package_version_file(
+    "jkConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+configure_package_config_file(
+    "${PROJECT_SOURCE_DIR}/buildsystem/jkConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/jk/cmake"
+)
+
+install(
+    FILES 
+        "${PROJECT_BINARY_DIR}/jkConfig.cmake"
+        "${PROJECT_BINARY_DIR}/jkConfigVersion.cmake"
+    DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/jk/cmake"
+)
