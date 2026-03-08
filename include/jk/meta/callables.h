@@ -339,7 +339,7 @@ struct GenericFunctor
 		noexcept(std::is_nothrow_invocable_v<ForwardLike<Self, XF>, Args...>)
 		requires(std::is_invocable_v<ForwardLike<Self, XF>, Args...>)
 	{
-		return std::invoke(std::forward_like<Self>(function), std::forward<Args>(args)...);
+		return std::invoke(std::forward_like<Self>(self.f), std::forward<Args>(args)...);
 	}
 #else
 	template<typename... Args>
