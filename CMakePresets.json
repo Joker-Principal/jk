@@ -6,12 +6,18 @@
             "name": "base",
             "hidden": true,
             "generator": "Ninja Multi-Config",
+            "binaryDir": "${fileDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_CONFIGURATION_TYPES": "Debug;RelWithDebInfo;Release",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "VCPKG_TARGET_TRIPLET": "x64-windows",
-                "VCPKG_APPLOCAL_DEPS": "OFF",
-                "QT_QML_GENERATE_QMLLS_INI": "ON"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "dev",
+            "hidden": true,
+            "inherits": [ "base" ],
+            "cacheVariables": {
+                "JK_BUILD_TESTING": "ON"
             }
         }
     ],

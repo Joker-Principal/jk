@@ -73,20 +73,13 @@ struct ReverseTrait<> { using type = TList<>; };
 /// at
 template<std::size_t i, typename... Ts> struct AtTrait;
 
-#if defined(__cpp_concepts)
-template<std::size_t i, typename T, typename... Ts> requires (i <= sizeof...(Ts))
-struct AtTrait<i, T, Ts...>
-{
-	using type = typename AtTrait<i - 1, Ts...>::type;
-};
-#else
 template<std::size_t i, typename T, typename... Ts>
 struct AtTrait<i, T, Ts...>
 {
 	static_assert(i <= sizeof...(Ts), "The index of At is out of range!");
 	using type = typename AtTrait<i - 1, Ts...>::type;
 };
-#endif
+
 
 template<typename T, typename... Ts>
 struct AtTrait<0, T, Ts...> { using type = T; };
