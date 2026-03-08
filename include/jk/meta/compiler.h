@@ -7,6 +7,7 @@
 #define JK_EMPTY(...)
 #define JK_COMMA(...) ,
 #define JK_EXPAND(x) x
+#define JK_APPLY(f, ...) f(__VA_ARGS__)
 
 #define JK_SELECT0(_0, ...) _0
 #define JK_SELECT1(_0, _1, ...) _1
@@ -96,10 +97,9 @@ JK_DISABLE_WARNING_UNUSED_MACRO
 // check if __VA_OPT__ is supported
 // https://stackoverflow.com/a/48045656/21866441
 #define JK_Y_VA_OPT_SUPPORTED(...) JK_EXEC(JK_SELECT2, (__VA_OPT__(,), 1, 0))
-#define JK_VA_OPT_SUPPORTED JK_Y_VA_OPT_SUPPORTED(?)
 
 // emulate __VA_OPT__ for compilers that don't support it
-#if JK_VA_OPT_SUPPORTED
+#if JK_Y_VA_OPT_SUPPORTED(?)
 #    define JK_VA_OPT(opt, ...) __VA_OPT__(opt)
 #    define JK_VA_OPT_FUNC(opt, ...) __VA_OPT__(opt)
 #    define JK_VA_OPT_COMMA(...) __VA_OPT__(,)
@@ -139,5 +139,36 @@ JK_DISABLE_WARNING_UNUSED_MACRO
 // JK_STR_VIEW("abc") => "abc"sv
 // JK_STR_VIEW("abc", u) => u"abc"sv
 #define JK_STR_VIEW(x, ...) __VA_ARGS__##"" x ""sv
+
+/// constexpr destructor
+#if __cpp_constexpr >= 201907L
+#   define JK_CONSTEXPR_DESTRUCTOR constexpr
+#else
+#   define JK_CONSTEXPR_DESTRUCTOR
+#endif
+
+/// non-type template class argument
+#if __cpp_nontype_template_args >= 201911L
+#   define JK_NONTYPE_CLASS_TEMPLATE_ARGS 1
+#elif __clang__ && __clang_major__ >= 12 && __cplusplus >= 202002L
+// up to now (2025-5-25),
+// clang 18+ partial supports P1907R1 (Generalized non-type template parameters of scalar type),
+// which leads to __cpp_nontype_template_args == 201411L,
+// fortunately clang 12+ supports P0732R2 (Class types as non-type template parameters),
+// so we can use class types as non-type template parameters since clang 12 in C++20 mode
+#   define JK_NONTYPE_CLASS_TEMPLATE_ARGS 1
+#else
+#   define JK_NONTYPE_CLASS_TEMPLATE_ARGS 0
+#endif
+
+// no unique address
+#if defined(_MSC_VER) && _MSC_VER >= 1929
+// https://devblogs.microsoft.com/cppblog/msvc-cpp20-and-the-std-cpp20-switch/#c++20-[[no_unique_address]]
+#   define JK_NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
+#elif __has_cpp_attribute(no_unique_address)
+#   define JK_NO_UNIQUE_ADDRESS [[no_unique_address]]
+#else
+#   define JK_NO_UNIQUE_ADDRESS
+#endif
 
 JK_DISABLE_WARNING_POP

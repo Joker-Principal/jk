@@ -5,18 +5,57 @@
 
 namespace JK::Meta::Details::Callables
 {
-template<typename T, typename = void>
-struct IsFunctor : std::false_type { using type = T; };
+template<typename T>
+using FunctorType = decltype(&std::decay_t<T>::operator());
 
 template<typename T>
-struct IsFunctor<T, std::void_t<decltype(&T::operator())>> : std::true_type
-{
-	using type = decltype(&T::operator());
-};
+concept isFunctor = requires { typename FunctorType<T>; };
 
 template<typename F>
-using FunctorType = typename IsFunctor<std::decay_t<F>>::type;
+using FunctionType = std::remove_pointer_t<std::decay_t<F>>;
 
+template<typename F>
+concept isFunction = std::is_function_v<FunctionType<F>>;
+
+/// workaround invoke_r before C++23
+#if __cpp_lib_invoke_r >= 202106L
+using std::invoke_r;
+#else
+template<typename R, typename... Args>
+constexpr R invoke_r(Args&&... args) noexcept(std::is_nothrow_invocable_r_v<R, Args...>)
+{
+	return static_cast<R>(std::invoke(std::forward<Args>(args)...));
+}
+#endif
+
+#define JK_GET_REF(i) JK_SELECT(i, , &, &&)
+#define JK_REF(func, cv) func(cv, 0) func(cv, 1) func(cv, 2)
+
+#define JK_GET_CV(i) JK_SELECT(i, , const, volatile, const volatile)
+#define JK_CV_REF(func) JK_REF(func, 0) JK_REF(func, 1) JK_REF(func, 2) JK_REF(func, 3)
+
+#define JK_V_LIKE(qualifier) <T qualifier, U>
+
+#define JK_S_LIKE(...) \
+	JK_OVERLOAD(__VA_OPT__(,) __VA_ARGS__, JK_V_LIKE(__VA_ARGS__), JK_EMPTY(__VA_ARGS__))
+
+#define JK_X_LIKE(cv, ref)                                             \
+	template<typename T, typename U>                                   \
+	struct ForwardLikeTrait JK_S_LIKE(JK_GET_CV(cv) JK_GET_REF(ref)) { \
+		using type = U JK_GET_CV(cv) JK_GET_REF(ref);                  \
+	};                                                                 \
+
+JK_CV_REF(JK_X_LIKE)
+
+#undef JK_V_LIKE
+#undef JK_S_LIKE
+#undef JK_X_LIKE
+
+template<typename T, typename U>
+requires std::is_same_v<std::remove_cvref_t<U>, U>
+using ForwardLike = typename ForwardLikeTrait<T, U>::type;
+
+/// CallableTrait (not support for calling conversion)
 template<bool variadic, bool nothrow, typename T, typename R, typename... Args>
 struct CallableImpl
 {
@@ -26,7 +65,7 @@ struct CallableImpl
 	using Class = T;
 	using Return = R;
 	using Arguments = TList<Args...>;
-	using Invoker = std::conditional_t<
+	using Signature = std::conditional_t<
 		!variadic,
 		R(Args...) noexcept(nothrow),
 		R(Args..., ...) noexcept(nothrow)
@@ -40,6 +79,27 @@ struct CallableImpl
 
 	template<template<bool vx, bool nt, typename Tx, typename Rx, typename... Ax> typename E>
 	using ExpandAll = E<variadic, nothrow, T, R, Args...>;
+
+	template<typename Rx>
+	using ReplaceReturn = CallableImpl<variadic, nothrow, T, Rx, Args...>;
+
+	template<typename... NewArgs>
+	using ReplaceArgs = CallableImpl<variadic, nothrow, T, R, NewArgs...>;
+
+	template<typename Tx>
+	using ReplaceClass = CallableImpl<variadic, nothrow, Tx, R, Args...>;
+
+	template<bool vx>
+	using ReplaceVariadic = CallableImpl<vx, nothrow, T, R, Args...>;
+
+	template<bool nx>
+	using ReplaceNothrow = CallableImpl<variadic, nx, T, R, Args...>;
+
+	template<bool vx, bool nx, typename Tx, typename Rx, typename... Ax>
+	friend constexpr bool operator==(const CallableImpl&, const CallableImpl<vx, nx, Tx, Rx, Ax...>&) noexcept
+	{
+		return std::is_same_v<CallableImpl, CallableImpl<vx, nx, Tx, Rx, Ax...>>;
+	}
 };
 
 template<typename F> struct CallableTrait;
@@ -65,17 +125,30 @@ template<typename F> struct CallableTrait;
 #define JK_CALLABLE_MEM(func) JK_CALLABLE_MEM_CV(JK_CALLABLE_MEM_REF, JK_CALLABLE_NOTHROW, func)
 
 // member function pointer
-#define JK_CALLABLE_MEM_CV_REF_NOTHROW(cv, ref, nothrow)                                                                          \
-	template<typename R, typename T, typename... Args>                                                                            \
-	struct CallableTrait<R(T::*)(Args...) JK_CALLABLE_GET_CV(cv) JK_CALLABLE_GET_REF(ref) JK_CALLABLE_GET_NOEXCEPT(nothrow)>      \
-	{                                                                                                                             \
-		using type = CallableImpl<false, bool(nothrow), T JK_CALLABLE_GET_CV(cv) JK_CALLABLE_GET_REF(ref) , R, Args...>;          \
-	};                                                                                                                            \
-	template<typename R, typename T, typename... Args>                                                                            \
-	struct CallableTrait<R(T::*)(Args..., ...) JK_CALLABLE_GET_CV(cv) JK_CALLABLE_GET_REF(ref) JK_CALLABLE_GET_NOEXCEPT(nothrow)> \
-	{                                                                                                                             \
-		using type = CallableImpl<true, bool(nothrow), T JK_CALLABLE_GET_CV(cv) JK_CALLABLE_GET_REF(ref) , R, Args...>;           \
-	};                                                                                                                            \
+#define JK_CALLABLE_MEM_X_CV_REF_NOTHROW(cv, ref, nothrow, noexcept)     \
+	template<typename R, typename T, typename... Args>                   \
+	struct CallableTrait<R(T::*)(Args...) cv ref noexcept>               \
+	{                                                                    \
+		using type = CallableImpl<false, nothrow, T cv ref, R, Args...>; \
+	};                                                                   \
+	template<typename R, typename T, typename... Args>                   \
+	struct CallableTrait<R(T::*)(Args..., ...) cv ref noexcept>          \
+	{                                                                    \
+		using type = CallableImpl<true, nothrow, T cv ref, R, Args...> ; \
+	};                                                                   \
+
+#define JK_CALLABLE_MEM_CV_REF_NOTHROW(cv, ref, nothrow) \
+	JK_CALLABLE_MEM_X_CV_REF_NOTHROW(JK_CALLABLE_GET_CV(cv), JK_CALLABLE_GET_REF(ref), bool(nothrow), JK_CALLABLE_GET_NOEXCEPT(nothrow))
+
+JK_CALLABLE_MEM(JK_CALLABLE_MEM_CV_REF_NOTHROW)
+#undef JK_CALLABLE_MEM_CV_REF_NOTHROW
+
+// member data pointer
+template<typename R, typename T>
+struct CallableTrait<R T::*>
+{
+	using type = CallableImpl<false, true, T*, R, TList<>>;
+};
 
 // c function pointer
 #define JK_CALLABLE_FUNC_NOTHROW(nothrow)                                      \
@@ -90,92 +163,143 @@ template<typename F> struct CallableTrait;
 		using type = CallableImpl<true, bool(nothrow), void, R, Args...>;      \
 	};                                                                         \
 
-// total 42 template specializations, without calling conversion supporting
-JK_CALLABLE_MEM(JK_CALLABLE_MEM_CV_REF_NOTHROW)
 JK_CALLABLE_NOTHROW(JK_CALLABLE_FUNC_NOTHROW)
+#undef JK_CALLABLE_FUNC_NOTHROW
 
-// member data pointer
-template<typename R, typename T>
-struct CallableTrait<R T::*> : CallableTrait<R(T::*)()> {};
-
-// functor(lambda) fallback
-template <typename F>
-struct CallableTrait : CallableTrait<FunctorType<F>>{};
+// functor (including lambda)
+template <isFunctor F>
+struct CallableTrait<F> : CallableTrait<FunctorType<F>>{};
 
 // std::function support
 template<typename F>
-struct CallableTrait<std::function<F>> : CallableTrait<F> {};
+struct CallableTrait<std::function<F>> : CallableTrait<std::decay_t<F>> {};
 
+/// Callable
 template<typename F>
-using Callable = typename CallableTrait<F>::type;
+concept isCallable = requires { typename CallableTrait<std::decay_t<F>>::type; };
 
-template<typename F, template<typename... Ts> typename E>
-using Expand = typename Callable<F>::template Expand<E>;
-
-template<typename F, template<typename... Ts> typename E>
-using ExpandClass = typename Callable<F>::template ExpandClass<E>;
-
-template<auto f>
-struct CallableOf : Callable<decltype(f)>
+template<isCallable F>
+struct Callable : CallableTrait<std::decay_t<F>>::type 
 {
-	static constexpr auto function = f;
+	template<typename... Ax>
+	static constexpr bool isInvocable = std::is_invocable_v<F, Ax...>;
+
+	template<typename R, typename... Args>
+	struct IsCompatibleWith
+	{
+		static constexpr bool value = std::is_invocable_r_v<R, F, Args...>;
+	};
+
+	template<isFunction Signature>
+	static constexpr bool isCompatibleWith = Callable<Signature>::template Expand<IsCompatibleWith>::value;
 };
 
-template<auto f>
-inline constexpr auto callableOf = CallableOf<f>{};
+template<typename F>
+using Return = typename Callable<F>::Return;
 
-template<auto f> using ReturnOf    = typename CallableOf<f>::Return;
-template<auto f> using ClassOf     = typename CallableOf<f>::Class;
-template<auto f> using ArgumentsOf = typename CallableOf<f>::Arguments;
-template<auto f> using InvokerOf   = typename CallableOf<f>::Invoker;
+template<typename F>
+using Class = typename Callable<F>::Class;
 
-template<auto f, template<typename... Ts> typename E>
-using ExpandOf = typename CallableOf<f>::template Expand<E>;
+template<typename F>
+using Arguments = typename Callable<F>::Arguments;
 
-template<auto f, template<typename... Ts> typename E>
-using ExpandClassOf = typename CallableOf<f>::template ExpandClass<E>;
+template<typename F>
+using Signature = typename Callable<F>::Signature;
 
+template<typename F>
+inline constexpr bool isVariadic = Callable<F>::isVariadic;
+
+template<typename F>
+inline constexpr bool isNothrow = Callable<F>::isNothrow;
+
+/// CallableValue
+template<typename F>
+struct CallableValueImpl
+{
+	template<bool variadic, bool nothrow, typename T, typename R, typename... Args>
+	struct Impl
+	{
+		using RawFunction = F;
+		using Function = std::decay_t<F>;
+		using Callable = Callable<F>;
+
+		template<typename... Ax>
+		static constexpr bool isInvocable = Callable::template isInvocable<Ax...>;
+
+		template<isFunction Signature>
+		static constexpr bool isCompatibleWith = Callable::template isCompatibleWith<Signature>;
+
+		constexpr std::strong_ordering operator<=>(const Impl&) const noexcept = default;
+
+		JK_NO_UNIQUE_ADDRESS Function function;
+	};
+};
+
+template<isCallable F>
+struct CallableValue : Callable<F>::template ExpandAll<CallableValueImpl<F>::template Impl>
+{
+	using Base = Callable<F>::template ExpandAll<CallableValueImpl<F>::template Impl>;
+
+	constexpr CallableValue(F f) noexcept(noexcept(Base(std::forward<F>(f)))) : // CTAD
+		Base(std::forward<F>(f))
+	{}
+};
+
+template<CallableValue v>
+struct CallableOf : decltype(v)::Callable
+{
+	static constexpr auto value = v;
+};
+
+template<CallableValue v>
+inline constexpr auto fn = CallableOf<v>{};
+
+template<CallableValue v>
+using ReturnOf = typename CallableOf<v>::Return;
+
+template<CallableValue v>
+using ClassOf = typename CallableOf<v>::Class;
+
+template<CallableValue v>
+using ArgumentsOf = typename CallableOf<v>::Arguments;
+
+template<CallableValue v>
+using SignatureOf = typename CallableOf<v>::Signature;
+
+/// invokeAs, returnAs, argAs
 template<typename R, typename... Args>
 struct InvokeTypedFunctor
 {
 	template<typename F>
 	friend constexpr auto operator|(F&& f, InvokeTypedFunctor)
 	{
-		return [fx = std::forward<F>(f)](Args... ts) constexpr -> R {
-			return static_cast<R>(fx(std::forward<Args>(ts)...));
+		return [fx = std::forward<F>(f)](Args... args) constexpr mutable -> R {
+			return invoke_r<R>(std::forward<F>(fx), std::forward<Args>(args)...);
 		};
 	}
 };
 
-template<typename Fr>
-inline constexpr auto invokeAs = typename Callable<Fr>::template Expand<InvokeTypedFunctor>{};
+template<isFunction Signature>
+inline constexpr auto invokeAs = typename Callable<Signature>::template Expand<InvokeTypedFunctor>{};
 
 template<typename R>
 struct ReturnTypedFunctor
 {
-	template<typename... Args, typename F>
-	static constexpr auto wrap(F&& f, TList<Args...>)
+	template<isCallable F>
+	friend constexpr auto operator|(F&& f, ReturnTypedFunctor)
 	{
-		return [fx = std::forward<F>(f)](Args... ts) constexpr -> R {
-			return static_cast<R>(fx(std::forward<Args>(ts)...));
-		};
+		// keep the arguments of f, only change the return type to R
+		using Signature = typename Callable<F>::template ReplaceReturn<R>::Signature;
+		return std::forward<F>(f) | invokeAs<Signature>;
 	}
 
 	template<typename F>
 	friend constexpr auto operator|(F&& f, ReturnTypedFunctor)
 	{
-		if constexpr (IsFunctor<std::decay_t<F>>::value)
-		{
-			using Arguments = typename Callable<F>::Arguments;
-			return wrap(std::forward<F>(f), Arguments{});
-		}
-		else
-		{
-			// f may be a functor with overloaded calling operators
-			return [fx = std::forward<F>(f)](auto&&... args) constexpr -> R {
-				return static_cast<R>(fx(std::forward<decltype(args)>(args)...));
-			};
-		}
+		// f may be a functor with overloaded calling operators
+		return [fx = std::forward<F>(f)]<typename... Args>(Args&&... args) constexpr mutable -> R {
+			return invoke_r<R>(std::forward<F>(fx), std::forward<Args>(args)...);
+		};
 	}
 };
 
@@ -188,8 +312,8 @@ struct ArgTypedFunctor
 	template<typename F>
 	friend constexpr auto operator|(F&& f, ArgTypedFunctor)
 	{
-		return [fx = std::forward<F>(f)](Args... args) constexpr {
-			return fx(std::forward<Args>(args)...);
+		return [fx = std::forward<F>(f)](Args... args) constexpr mutable {
+			return std::invoke(std::forward<F>(fx), std::forward<Args>(args)...);
 		};
 	}
 };
@@ -197,35 +321,73 @@ struct ArgTypedFunctor
 template<typename... Args>
 inline constexpr auto argAs = ArgTypedFunctor<Args...>{};
 
-template<typename F> struct FuncPtrWrapper { using type = F; };
+/// GenericFunctor: wrap a final overload functor or a non-class type (e.g. function pointer)
 
-template<typename R, typename... Args>
-struct FuncPtrWrapper<R(Args...)>
+template<typename F>
+struct GenericFunctor
 {
-	using FuncPtr = R(*)(Args...);
-	struct type
+	using XF = std::decay_t<F>;
+	JK_NO_UNIQUE_ADDRESS XF f;
+
+	constexpr GenericFunctor(F&& f) noexcept(std::is_nothrow_constructible_v<XF, F&&>) :
+		f(std::forward<F>(f))
+	{}
+
+#if __cpp_explicit_this_parameter >= 202110L
+	template<typename Self, typename... Args>
+	constexpr auto operator()(this Self&& self, Args&&... args)
+		noexcept(std::is_nothrow_invocable_v<ForwardLike<Self, XF>, Args...>)
+		requires(std::is_invocable_v<ForwardLike<Self, XF>, Args...>)
 	{
-		constexpr type(FuncPtr f) noexcept : f(f) {}
-		constexpr R operator()(Args... args) const { return f(std::forward<Args>(args)...); }
-		FuncPtr f;
-	};
+		return std::invoke(std::forward_like<Self>(function), std::forward<Args>(args)...);
+	}
+#else
+	template<typename... Args>
+	constexpr decltype(auto) operator()(Args&&... args) &
+		noexcept(std::is_nothrow_invocable_v<XF &, Args...>)
+		requires(std::is_invocable_v<XF &, Args...>)
+	{
+		return std::invoke(f, std::forward<Args>(args)...);
+	}
+
+	template<typename... Args>
+	constexpr decltype(auto) operator()(Args&&... args) const&
+		noexcept(std::is_nothrow_invocable_v<XF const&, Args...>)
+		requires(std::is_invocable_v<XF const&, Args...>)
+	{
+		return std::invoke(f, std::forward<Args>(args)...);
+	}
+
+	template<typename... Args>
+	constexpr decltype(auto) operator()(Args&&... args) &&
+		noexcept(std::is_nothrow_invocable_v<XF &&, Args...>)
+		requires(std::is_invocable_v<XF &&, Args...>)
+	{
+		return std::invoke(std::move(f), std::forward<Args>(args)...);
+	}
+
+	template<typename... Args>
+	constexpr decltype(auto) operator()(Args&&... args) const&&
+		noexcept(std::is_nothrow_invocable_v<XF const&&, Args...>)
+		requires(std::is_invocable_v<XF const&&, Args...>)
+	{
+		return std::invoke(std::move(f), std::forward<Args>(args)...);
+	}
+#endif
+};
+
+/// Visitor
+template<typename... Vs>
+struct Visitor : GenericFunctor<Vs>...
+{
+	constexpr Visitor(Vs&&... vs) : GenericFunctor<Vs>(std::forward<Vs>(vs))... {}
+	using GenericFunctor<Vs>::operator()...;
 };
 
 template<typename... Vs>
-struct Visitor : FuncPtrWrapper<Vs>::type...
-{
-	template<typename V>
-	using Base = typename FuncPtrWrapper<V>::type;
+Visitor(Vs&&...) -> Visitor<Vs...>;
 
-	template<typename... Vi>
-	constexpr Visitor(Vi&&... fs) : Base<Vs>(std::forward<Vi>(fs))... {}
-
-	using Base<Vs>::operator()...;
-};
-
-template<typename... Vi>
-Visitor(Vi&&...) -> Visitor<std::remove_pointer_t<std::decay_t<Vi>>...>;
-
+/// curry
 template<typename F, typename... Args>
 constexpr auto curry(F&& f, Args&&... args1)
 	noexcept(noexcept(std::make_tuple(std::forward<F>(f), std::forward<Args>(args1)...)))
@@ -239,158 +401,173 @@ constexpr auto curry(F&& f, Args&&... args1)
 	};
 #else
 	return [fx = std::forward<F>(f), ...args1x = std::forward<Args>(args1)](auto&&... args2) mutable {
-		return std::invoke(fx, std::forward<Args>(args1x)..., std::forward<decltype(args2)>(args2)...);
+		return std::invoke(std::forward<F>(fx), std::forward<Args>(args1x)..., std::forward<decltype(args2)>(args2)...);
 	};
 #endif
 }
 
-template<typename T> struct RefTrait { using type = T&; };
-template<typename T> struct RefTrait<T&&> { using type = T&&; };
-template<typename T> using ForceRef = typename RefTrait<T>::type;
-
-template<typename T, typename R, typename... As>
-struct BindImpl
-{
-	template<auto f, typename Tr>
-	struct ZeroCostFunc
-	{
-		constexpr R operator()(As... args) const
-		{
-			return std::invoke(f, static_cast<ForceRef<T>>(*obj), std::forward<As>(args)...);
-		}
-		Tr* const obj;
-	};
-
-	template<typename F, typename Tr>
-	struct Func
-	{
-		constexpr R operator()(As... args) const
-		{
-			return std::invoke(f, static_cast<ForceRef<T>>(*obj), std::forward<As>(args)...);
-		}
-		Tr* const obj;
-		F f;
-	};
-};
-
-template<auto f>
+/// bind
+template<bool variadic, bool nothrow, typename T, typename R, typename... As>
 struct Bind
 {
-	template<typename T>
-	constexpr auto operator()(T* obj) const noexcept
+	template<auto f>
+	static constexpr auto zeroCost(std::remove_reference_t<T>* const obj)
 	{
-		using Impl = typename CallableOf<f>::template ExpandClass<BindImpl>;
-		using Func = typename Impl::template ZeroCostFunc<f, T>;
-		return Func{obj};
+		if constexpr (!variadic)
+			return [obj](As... args) noexcept(nothrow) -> R {
+				return std::invoke(f, obj, std::forward<As>(args)...);
+			};
+		else
+			return [obj]<typename... VArgs>(As... args, VArgs&&... vargs) noexcept(nothrow) -> R {
+				return std::invoke(f, obj, std::forward<As>(args)..., std::forward<VArgs>(vargs)...);
+			};
+	}
+
+	template<typename F>
+	static constexpr auto twoPointer(std::remove_reference_t<T>* const obj, F f)
+	{
+		if constexpr (!variadic)
+			return [obj, f](As... args) noexcept(nothrow) -> R {
+				return std::invoke(f, obj, std::forward<As>(args)...);
+			};
+		else
+			return [obj, f]<typename... VArgs>(As... args, VArgs&&... vargs) noexcept(nothrow) -> R {
+				return std::invoke(f, obj, std::forward<As>(args)..., std::forward<VArgs>(vargs)...);
+			};
 	}
 };
 
-template<>
-struct Bind<0>
+template<CallableValue v, typename T>
+[[nodiscard]] constexpr auto bind(T* obj) noexcept
 {
-	template<typename T, typename F>
-	constexpr auto operator()(T* obj, F f) const noexcept
-	{
-		using Impl = typename Callable<F>::template ExpandClass<BindImpl>;
-		using Func = typename Impl::template Func<F, T>;
-		return Func{obj, f};
-	}
-};
+	static_assert(std::is_member_pointer_v<decltype(v.function)>, "bind is used for member pointer only");
+	return CallableOf<v>::template ExpandAll<Bind>::template zeroCost<v.function>(obj);
+}
 
-template<auto f = 0>
-inline constexpr auto bind = Bind<f>{};
+template<CallableValue v, typename T>
+constexpr auto bind(T& obj) noexcept { return bind<v>(std::addressof(obj)); }
 
-template<typename T, typename R, typename... Args>
-struct UnbindImpl
+template<CallableValue v, typename T>
+constexpr auto bind(T* obj, CallableOf<v>) noexcept { return bind<v>(obj); }
+
+template<CallableValue v, typename T>
+constexpr auto bind(T& obj, CallableOf<v>) noexcept { return bind<v>(std::addressof(obj)); }
+
+template<typename T, typename F>
+requires std::is_member_pointer_v<std::decay_t<F>>
+[[nodiscard]] constexpr auto bind(T* obj, F f) noexcept
+{
+	using M = std::decay_t<F>;
+	return Callable<M>::template ExpandAll<Bind>::template twoPointer<M>(obj, f);
+}
+
+template<typename T, typename F>
+constexpr auto bind(T& obj, F f) noexcept { return bind(std::addressof(obj), f); }
+
+/// unbind
+template<bool variadic, bool nothrow, typename T, typename R, typename... As>
+struct Unbind
 {
 	template<auto f>
-	struct Impl
+	static constexpr auto impl()
 	{
-		constexpr R operator()(std::remove_reference_t<T>* obj, Args... args) const
-		{
-			return std::invoke(f, static_cast<ForceRef<T>>(*obj), std::forward<Args>(args)...);
-		}
-
-		constexpr R operator()(ForceRef<T> obj, Args... args) const
-		{
-			return std::invoke(f, static_cast<ForceRef<T>>(obj), std::forward<Args>(args)...);
-		}
-	};
+		if constexpr (!variadic)
+			return []<typename C>(C&& obj, As... as) noexcept(nothrow) -> R {
+				return std::invoke(f, std::forward<C>(obj), std::forward<As>(as)...);
+			};
+		else
+			return []<typename C, typename... VArgs>(C&& obj, As... as, VArgs&&... vargs) noexcept(nothrow)  -> R {
+				return std::invoke(f, std::forward<C>(obj), std::forward<As>(as)..., std::forward<VArgs>(vargs)...);
+			};
+	}
 };
 
-template<auto memberFunc>
-constexpr auto unbind =
-	typename CallableOf<memberFunc>::template ExpandClass<UnbindImpl>::template Impl<memberFunc>{};
+template<std::is_member_pointer memFn>
+inline constexpr auto unbind = CallableOf<memFn>::template ExpandClass<Unbind>::template impl<memFn>();
 
-template<typename F>
-constexpr bool isFunction = std::is_function_v<std::remove_pointer_t<std::decay_t<F>>>;
-
-template<typename R, typename... Args>
+/// FunctionRef
+template<bool variadic, bool nothrow, typename, typename R, typename... Args>
 class FunctionRefImpl
 {
+	static_assert(!variadic, "no way to forward arguments to a variadic function pointer");
+
+	union Target
+	{
+		const void* obj;
+		void(*cfunc)();
+	};
 public:
-	FunctionRefImpl() noexcept : target(static_cast<const void*>(nullptr)), func(nullptr) {}
-
-	FunctionRefImpl(std::nullptr_t) noexcept : FunctionRefImpl() {}
-
-	template<typename Rx, typename... Ax>
-	FunctionRefImpl(Rx(*f)(Ax...)) noexcept :
-		target(reinterpret_cast<void(*)()>(f)),
-		func([](Target xtarget, Args&&... args) -> R {
-			return reinterpret_cast<Rx(*)(Ax...)>(xtarget.cfunc)(std::forward<Args>(args)...);
-		})
-	{}
-
-	template<typename F, std::enable_if_t<!isFunction<F>, int> = 0>
-	FunctionRefImpl(F&& f) noexcept :
-		target(static_cast<const void*>(std::addressof(f))),
-		func([](Target xtarget, Args&&... args) -> R {
-			auto of = static_cast<std::add_pointer_t<F>>(const_cast<void*>(xtarget.obj));
-			return std::invoke(*of, std::forward<Args>(args)...);
-		})
-	{}
-
-	template<typename C, auto f, std::enable_if_t<f != 0, int> = 0>
-	constexpr FunctionRefImpl(C* obj, CallableOf<f>) :
-		target(static_cast<const void*>(obj)),
-		func([](Target xtarget, Args&&... args) -> R {
-			auto of = static_cast<C*>(const_cast<void*>(xtarget.obj));
-			return std::invoke(f, *of, std::forward<Args>(args)...);
-		})
-	{}
-
-	template<typename C, auto f, std::enable_if_t<f != 0, int> = 0>
-	constexpr FunctionRefImpl(C& obj, CallableOf<f> callable) :
-		FunctionRefImpl(std::addressof(obj), callable)
-	{}
-
+	constexpr FunctionRefImpl() noexcept : target(), func(nullptr) {}
+	constexpr FunctionRefImpl(std::nullptr_t) noexcept : FunctionRefImpl() {}
 	constexpr FunctionRefImpl(const FunctionRefImpl&) noexcept = default;
 	constexpr FunctionRefImpl& operator=(const FunctionRefImpl&) & noexcept = default;
 	constexpr FunctionRefImpl(FunctionRefImpl&&) noexcept = default;
 	constexpr FunctionRefImpl& operator=(FunctionRefImpl&&) & noexcept = default;
+	JK_CONSTEXPR_DESTRUCTOR ~FunctionRefImpl() noexcept = default;
+
+	// functor
+	template<typename F>
+	requires Callable<F>::template isCompatibleWith<R(Args...)>
+	constexpr FunctionRefImpl(F&& f) noexcept :
+		target(static_cast<const void*>(std::addressof(f))),
+		func([](Target xtarget, Args&&... args) -> R {
+			auto* of = static_cast<std::add_pointer_t<F>>(const_cast<void*>(xtarget.obj));
+			return invoke_r<R>(*of, std::forward<Args>(args)...);
+		})
+	{}
+
+	// compile-time callables
+	template<CallableValue v>
+	requires (v.template isCompatibleWith<R(Args...)>)
+	constexpr FunctionRefImpl(CallableOf<v>) noexcept :
+		target(),
+		func([](Target xtarget, Args&&... args) -> R {
+			return invoke_r<R>(v.function, std::forward<Args>(args)...);
+		})
+	{}
+
+	// bind-style
+	template<typename T, CallableValue v>
+	requires (v.template isCompatibleWith<R(T*, Args...)>)
+	constexpr FunctionRefImpl(T* obj, CallableOf<v>) noexcept :
+		target(static_cast<const void*>(obj)),
+		func([](Target xtarget, Args&&... args) -> R {
+			auto of = static_cast<T*>(const_cast<void*>(xtarget.obj));
+			return invoke_r<R>(v.function, of, std::forward<Args>(args)...);
+		})
+	{}
+
+	template<typename T, CallableValue v>
+	requires (v.template isCompatibleWith<R(T&, Args...)>)
+	constexpr FunctionRefImpl(T& obj, CallableOf<v> call) noexcept :
+		FunctionRefImpl(std::addressof(obj), call)
+	{}
+
+	// runtime-assigned function pointer
+	template<typename F>
+	requires (std::is_function_v<F> && std::is_invocable_r_v<R, F, Args...>)
+	explicit FunctionRefImpl(F* f) noexcept :
+		target(reinterpret_cast<void(*)()>(f)),
+		func([](Target xtarget, Args&&... args) -> R {
+			auto fp = reinterpret_cast<F*>(xtarget.cfunc);
+			return invoke_r<R>(*fp, std::forward<Args>(args)...);
+		})
+	{}
 
 	constexpr operator bool() const noexcept { return !!func; }
 
-	constexpr R operator()(Args... args) const
+	constexpr R operator()(Args... args) const noexcept(nothrow)
 	{
-		return std::invoke(func, target, std::forward<Args>(args)...);
+		return func(target, std::forward<Args&&>(args)...);
 	}
 
 private:
-	union Target
-	{
-		constexpr explicit Target(const void* obj) noexcept : obj(obj) {}
-		constexpr explicit Target(void(*cfunc)()) noexcept : cfunc(cfunc) {}
-
-		const void* obj;
-		void(*cfunc)();
-	};
 	Target target;
-	R(*func)(Target, Args&&...);
+	R(*func)(Target, Args&&...) noexcept(nothrow);
 };
 
-template<typename F>
-using FunctionRef = typename Callable<F>::template Expand<FunctionRefImpl>;
+template<isFunction Signature>
+using FunctionRef = typename Callable<Signature>::template ExpandAll<FunctionRefImpl>;
 
 template<typename T, bool useInitialList = false>
 inline constexpr auto constructor = [](auto&&... args) -> T {
@@ -439,6 +616,11 @@ template<typename Func, typename C>
 concept MemberOf = IsMemberOf<C>::template value<Func>;
 #endif
 
+struct UseInitializerList
+{
+	constexpr explicit UseInitializerList() noexcept = default;
+} inline constexpr useInit;
+
 /// A lazy generator that will only call the function when needed
 template<typename F, std::enable_if_t<std::is_invocable_v<F>, int> = 0>
 class Lazy
@@ -456,15 +638,10 @@ public:
     constexpr decltype(auto) operator()() const noexcept(noexcept(generator())) { return generator(); }
 
 private:
-	F generator;
+	JK_NO_UNIQUE_ADDRESS F generator;
 };
 
 template<typename F> Lazy(F&&) -> Lazy<std::decay_t<F>>;
-
-struct UseInitializerList
-{
-	constexpr explicit UseInitializerList() noexcept = default;
-} inline constexpr useInit;
 
 template<typename T, typename... Args>
 constexpr auto lazy(Args&&... args)
@@ -485,86 +662,100 @@ constexpr auto lazy(UseInitializerList, Args&&... args)
 
 namespace JK::Meta
 {
-/// using F = double (T::*)(int, char);
-/// template<typename R, typename... As> struct MyTemplate;
-/// using V = Callable<F>::Expand<MyTemplate>; // V == MyTemplate<double, int, char>
+/// detect whether a class type has a non-overloaded operator() defined, including lambda
+using Details::Callables::isFunctor;
+
+/// detect whether a type is a function pointer or reference, but not functor
+using Details::Callables::isFunction;
+
+using Details::Callables::invoke_r;
+
+// add cv-qualifier and reference qualifier to U like T
+using Details::Callables::ForwardLike;
+
+/// callable traits and utilities:
+/// 1. specialization to trait callable infomation out:
+/// 	Callable<R(Args...)> = {        |  Callable<R(Args..., ...) noexcept> = {
+/// 	    Class = void;               |      Class = void;
+/// 	    Return = R;                 |      Return = R;
+/// 	    Arguments = TList<Args...>; |      Arguments = TList<Args...>;
+/// 	    Signature = R(Args...);     |      Signature = R(Args..., ...) noexcept;
+/// 	    isVariadic = false;         |      isVariadic = true;
+/// 	    isNothrow = false;          |      isNothrow = true;
+/// 	}                               |  }
+///     --------------------------------------------------------------------------------------------------
+/// 	Callable<R(T::*)(Args...)> = {  |  Callable<R(T::*)(Args..., ...) const volatile && noexcept> = {
+/// 	    Class = T;                  |      Class = T const volatile &&;
+/// 	    Return = R;                 |      Return = R;
+/// 	    Arguments = TList<Args...>; |      Arguments = TList<Args...>;
+/// 	    Signature = R(Args...);     |      Signature = R(Args..., ...) noexcept;
+/// 	    isVariadic = false;         |      isVariadic = true;
+/// 	    isNothrow = false;          |      isNothrow = true;
+/// 	}                               |  }
+/// 	--------------------------------------------------------------------------------------------------
+/// 	                                |  auto f = [](){};
+///     Callable<R T::*> = {            |  Callable<decltype(f)> = {
+/// 	    Class = T*;                 |      Class = decltype(f);
+/// 	    Return = R;                 |      Return = void;
+/// 	    Arguments = TList<>;        |      Arguments = TList<>;
+/// 	    Signature = R() noexcept;   |      Signature = void();
+/// 	    isVariadic = false;         |      isVariadic = false;
+/// 	    isNothrow = true;           |      isNothrow = false;
+/// 	}                               |  }
+///     --------------------------------------------------------------------------------------------------
+/// 	Callable<std::function<R(Args...)>> = Callable<R(Args...)>
+///
+/// 2. expand callable infomation to template E:
+///     Callable::Expand<E> = E<R, Args...>;
+///     Callable::ExpandClass<E> = E<T, R, Args...>;
+///     Callable::ExpandAll<E> = E<isVariadic, isNothrow, T, R, Args...>
+/// 
+/// 3. replace callable infomation with new one:
+///     Callable::ReplaceReturn<Rx>       = CallableImpl<variadic, nothrow, T, Rx, Args...>;
+///     Callable::ReplaceArgs<NewArgs...> = CallableImpl<variadic, nothrow, T, R, NewArgs...>;
+///     Callable::ReplaceClass<Tx>        = CallableImpl<variadic, nothrow, Tx, R, Args...>;
+///     Callable::ReplaceVariadic<vx>     = CallableImpl<vx, nothrow, T, R, Args...>;
+///     Callable::ReplaceNothrow<nx>      = CallableImpl<variadic, nx, T, R, Args...>;
 using Details::Callables::Callable;
+using Details::Callables::isCallable;
 
+using Details::Callables::Return;
+using Details::Callables::Class;
+using Details::Callables::Arguments;
+using Details::Callables::Signature;
+using Details::Callables::isVariadic;
+using Details::Callables::isNothrow;
+
+/// compile-time callable value wrapper, can be used as non-type template parameter
+/// 	template<CallableValue v>
+/// 	void foo(CallableOf<v>) { ... }
+/// 	foo(fn<&A::foo>);
+using Details::Callables::CallableValue;
 using Details::Callables::CallableOf;
-using Details::Callables::callableOf;
+using Details::Callables::fn;
 
-/// using F = double (T::*)(int, char);
-/// using V = FunctorReturn<F>; // V == double
-template<typename F>
-using FunctorReturn = typename Callable<F>::Return;
-
-/// using F = double (T::*)(int, char);
-/// using V = FunctorClass<F>; // V == T
-template<typename F>
-using FunctorClass = typename Callable<F>::Class;
-
-/// using F = double (T::*)(int, char);
-/// using V = FunctorArguments<F>; // V == Types::TList<int, char>
-template<typename F>
-using FunctorArguments = typename Callable<F>::Arguments;
-
-/// using F = double (T::*)(int, char);
-/// using V = FunctorInvoker<F>; // V == double(int, char)
-template<typename F>
-using FunctorInvoker = typename Callable<F>::Invoker;
-
-using Details::Callables::Expand;
-
-/// template<typename R, typename... As> struct MyTemplate {};
-/// using F = double (T::*)(int, char) const&;
-/// using V = ExpandClass<F, MyTemplate>; // V == MyTemplate<const T&, double, int, char>
-using Details::Callables::ExpandClass;
-
-/// struct A { int foo(); };
-/// A& foo2();
-/// using R = ReturnOf<&A::foo>; // R == int
-/// using C2 = ClassOf<foo2>; // C2 == A&
 using Details::Callables::ReturnOf;
-
-/// struct A { void foo() const&&; };
-/// A& foo2();
-/// using C = ClassOf<&A::foo>; // C == const A&&
-/// using C2 = ClassOf<foo2>; // C2 == void
 using Details::Callables::ClassOf;
-
-/// struct A { void foo(int, char, double); };
-/// using As = Arguments<&A::foo>; // As == Types::TList<int, char, double>
 using Details::Callables::ArgumentsOf;
+using Details::Callables::SignatureOf;
 
-/// struct A { double foo(int, char); };
-/// using I = InvokerOf<&A::foo>; // I == double(int, char)
-using Details::Callables::InvokerOf;
-
-/// template<typename R, typename... As> struct MyTemplate {};
-/// struct A { double foo(int, char); };
-/// using My = ExpandOf<&A::foo, MyTemplate>; // My == MyTemplate<double, int, char>
-using Details::Callables::ExpandOf;
-
-/// template<typename T, typename R, typename... As> struct MyTemplate {};
-/// struct A { double foo(int, char) const&&; };
-/// using My = ExpandClassOf<&A::foo, MyTemplate>;
-/// // My == MyTemplate<const A&&, double, int, char>
-using Details::Callables::ExpandClassOf;
-
-/// auto generic = [...](auto...) -> auto {...};
-/// auto typed = generic | invokeAs<int(int)>;
-///    int r = typed(10); // int(generic(10));
-using Details::Callables::invokeAs;
-
-/// [...](auto...) -> auto {...} | returnAs<int>
+/// specify the signature to invoke a callable, useful for generic lambda with auto parameters
+/// invokeAs:
+/// 	auto generic = [...](auto...) -> auto {...};
+/// 	auto typed = generic | invokeAs<int(int)>;
+/// 	int r = typed(10); // int(generic(10));
+/// returnAs:
+///     [...](auto...) -> auto {...} | returnAs<int>
 ///        => [...](auto...) -> int {...}
-using Details::Callables::returnAs;
-
-/// [...](auto...) -> auto {...} | argAs<int, int>
+/// argAs:
+///     [...](auto...) -> auto {...} | argAs<int, int>
 ///        => [...](int, int) -> auto {...}
+using Details::Callables::invokeAs;
+using Details::Callables::returnAs;
 using Details::Callables::argAs;
 
 /// https://www.modernescpp.com/index.php/visiting-a-std-variant-with-the-overload-pattern/
+using Details::Callables::GenericFunctor;
 using Details::Callables::Visitor;
 
 /// https://en.wikipedia.org/wiki/Currying
@@ -617,15 +808,13 @@ using Details::Callables::unary;
 /// struct B { int bar(int); };
 /// IsMemberOf<A>::value<&A::foo> => true
 /// IsMemberOf<B>::value<&A::foo> => false
-using Details::Callables::IsMemberOf;
-
-#ifdef __cpp_concepts
 /// template<MemberOf<A> F> struct X {};
 /// X<decltype(&A::foo)> x; // OK
 /// X<decltype(&B::bar)> x; // error: no matching template
+using Details::Callables::IsMemberOf;
 using Details::Callables::MemberOf;
-#endif
 
+/// tag type to specify using initializer list constructor
 using Details::Callables::UseInitializerList;
 using Details::Callables::useInit;
 
