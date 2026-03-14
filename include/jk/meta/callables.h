@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include <optional>
 #include <jk/meta/compiler.h>
 #include <jk/meta/type-list.h>
 
@@ -663,22 +664,21 @@ constexpr auto lazy(UseInitializerList, Args&&... args)
 template<typename F>
 struct Cleanup
 {
-	Cleanup(F&& func) : f(std::forward<F>(func)), doClean(true) {}
-	~Cleanup() { if(doClean && f) f(); }
+	Cleanup(F&& func) : f(std::forward<F>(func)) {}
+	~Cleanup() { if(f) (*f)(); }
 
 	Cleanup(Cleanup&&) = default;
 	Cleanup& operator=(Cleanup&&) & = default;
 	Cleanup(const Cleanup&) = delete;
 	Cleanup& operator=(const Cleanup&) & = delete;
 
-	std::decay_t<F> f;
-	bool doClean;
+	std::optional<std::decay_t<F>> f;
 };
 
-template<typename... Cs>
-void resetCleans(Cs&... clean) noexcept
+template<typename... Fs>
+void resetCleans(Cleanup<Fs>&... clean) noexcept
 {
-	((clean.doClean = false), ...);
+	((clean.f.reset()), ...);
 }
 } // namespace Callables::Detail
 
