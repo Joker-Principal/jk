@@ -658,6 +658,28 @@ constexpr auto lazy(UseInitializerList, Args&&... args)
 		return std::apply([](auto&&... as) { return T{std::forward<decltype(as)>(as)...}; }, std::move(as));
 	});
 }
+
+/// cleanup
+template<typename F>
+struct Cleanup
+{
+	Cleanup(F&& func) : f(std::forward<F>(func)), doClean(true) {}
+	~Cleanup() { if(doClean && f) f(); }
+
+	Cleanup(Cleanup&&) = default;
+	Cleanup& operator=(Cleanup&&) & = default;
+	Cleanup(const Cleanup&) = delete;
+	Cleanup& operator=(const Cleanup&) & = delete;
+
+	std::decay_t<F> f;
+	bool doClean;
+};
+
+template<typename... Cs>
+void resetCleans(Cs&... clean) noexcept
+{
+	((clean.doClean = false), ...);
+}
 } // namespace Callables::Detail
 
 namespace JK::Meta
@@ -828,4 +850,9 @@ using Details::Callables::useInit;
 /// m.try_emplace(2, lazy<Value>(useInit, 3, 4)); // m[2] == Value{3, 4}
 using Details::Callables::Lazy;
 using Details::Callables::lazy;
+
+/// auto* p = new int(0);
+/// Cleanup c([p]{ delete p; }); // p will be deleted when c goes out of scope
+using Details::Callables::Cleanup;
+using Details::Callables::resetCleans;
 }

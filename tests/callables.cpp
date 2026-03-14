@@ -94,7 +94,7 @@ struct X {
     R (*f)(Args...);
 };
 
-void xxx(N);
+void xxx(N) {}
 
 void yyy(N* n) {
     auto v = X(xxx);
