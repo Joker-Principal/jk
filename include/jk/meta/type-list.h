@@ -80,7 +80,6 @@ struct AtTrait<i, T, Ts...>
 	using type = typename AtTrait<i - 1, Ts...>::type;
 };
 
-
 template<typename T, typename... Ts>
 struct AtTrait<0, T, Ts...> { using type = T; };
 
