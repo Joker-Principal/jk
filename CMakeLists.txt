@@ -29,6 +29,7 @@ list(APPEND sources
     meta/compiler.h
     meta/type-list.h
     meta/callables.h
+    wrap/string.h
 )
 
 list(APPEND compile_options
