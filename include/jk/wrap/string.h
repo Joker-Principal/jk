@@ -111,6 +111,32 @@ std::string hex(std::string_view bytes, std::string_view sep = {})
 {
     return hex<upper>(std::span(bytes), sep);
 }
+
+inline std::string lower(std::string_view s)
+{
+	std::string result;
+	result.reserve(s.size());
+	for(char c : s) result.push_back(std::tolower(static_cast<unsigned char>(c)));
+	return result;
+}
+
+inline void lower(std::string& s) noexcept
+{
+	for(char& c : s) c = std::tolower(static_cast<unsigned char>(c));
+}
+
+inline std::string upper(std::string_view s)
+{
+	std::string result;
+	result.reserve(s.size());
+	for(char c : s) result.push_back(std::toupper(static_cast<unsigned char>(c)));
+	return result;
+}
+
+inline void upper(std::string& s) noexcept
+{
+	for(char& c : s) c = std::toupper(static_cast<unsigned char>(c));
+}
 } // namespace JK::Wrap::Details::Strings
 
 namespace JK::Wrap
