@@ -472,6 +472,10 @@ struct UniteTrait<TList<Ready...>>
 
 template<typename... Lists>
 using Unite = typename UniteTrait<Lists...>::type;
+
+/// one of
+template<typename T, typename... Ts>
+concept OneOf = TList<Ts...>::template contains<T>;
 }
 
 namespace JK::Meta
@@ -489,4 +493,7 @@ using Details::TLists::Zip;
 
 /// Unite<TList<T1, T2, T3>, TList<T1, T2, T4>> => TList<T1, T2, T3, T4>
 using Details::TLists::Unite;
+
+/// OneOf<T, T1, T2, T3, ...> => true if T is one of T1, T2, T3, ...
+using Details::TLists::OneOf;
 }
