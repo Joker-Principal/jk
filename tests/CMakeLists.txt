@@ -42,3 +42,14 @@ endfunction()
 add_ctest_task(type_list type-list.cpp)
 add_ctest_task(callables callables.cpp)
 add_ctest_task(string string.cpp)
+
+if("test_module" IN_LIST JK_TESTS_NEED_BUILD)
+	add_executable(test_module module.cpp)
+else()
+	add_executable(test_module EXCLUDE_FROM_ALL module.cpp)
+endif()
+target_link_libraries(test_module PRIVATE joker::module)
+add_test(
+	NAME test_module
+	COMMAND "$<TARGET_FILE:test_module>"
+)

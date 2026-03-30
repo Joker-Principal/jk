@@ -49,7 +49,7 @@ add_library(kit INTERFACE)
 add_library(joker::kit ALIAS kit)
 
 target_sources(kit INTERFACE
-	FILE_SET jk_file_set
+	FILE_SET jk_header_set
 	TYPE HEADERS
 	BASE_DIRS include
 	FILES ${source_paths}
@@ -65,10 +65,31 @@ target_compile_definitions(kit INTERFACE ${definitions})
 
 target_compile_options(kit INTERFACE ${compile_options})
 
-install(TARGETS kit 
+add_library(module)
+add_library(joker::module ALIAS module)
+
+set_target_properties(module PROPERTIES
+    CXX_EXTENSIONS OFF
+)
+
+if(NOT CMAKE_CXX_STANDARD)
+    target_compile_features(module PUBLIC cxx_std_20)
+endif()
+
+target_sources(module PUBLIC
+    FILE_SET jk_module_set
+    TYPE CXX_MODULES
+    BASE_DIRS "include"
+    FILES "include/jk/jk.cppm"
+)
+
+target_link_libraries(module PUBLIC joker::kit)
+
+install(TARGETS kit module
     EXPORT jkTargets
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    FILE_SET jk_file_set
+    FILE_SET jk_header_set
+    FILE_SET jk_module_set DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 ### tests
