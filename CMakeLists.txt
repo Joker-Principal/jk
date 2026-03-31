@@ -9,15 +9,6 @@ include(GNUInstallDirs)
 include(CTest)
 include(FeatureSummary)
 
-### dependencies
-find_package(Qt6 QUIET COMPONENTS Core Widgets Sql Xml)
-find_package(fmt CONFIG QUIET)
-find_package(nlohmann_json CONFIG QUIET)
-find_package(Protobuf CONFIG QUIET)
-find_package(asio CONFIG QUIET)
-find_package(range-v3 CONFIG QUIET)
-find_package(fftw3 CONFIG QUIET)
-
 ### create target
 set(sources)
 set(link_libs)
@@ -37,6 +28,9 @@ list(APPEND compile_options
     # https://devblogs.microsoft.com/cppblog/announcing-full-support-for-a-c-c-conformant-preprocessor-in-msvc/
     # https://learn.microsoft.com/en-us/cpp/build/reference/zc-preprocessor?view=msvc-170
     "$<$<CXX_COMPILER_ID:MSVC>:/Zc:preprocessor>"
+
+    # make MSVC source files be treated as UTF-8 by default
+    "$<$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>:/utf-8>"
 )
 
 ## add library
