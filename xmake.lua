@@ -9,12 +9,7 @@ option("JK_BUILD_TESTING")
 
 target("kit")
 	set_kind("headeronly")
-	add_headerfiles(
-		"include/jk/meta/compiler.h",
-		"include/jk/meta/type-list.h",
-		"include/jk/meta/callables.h",
-		"include/jk/wrap/string.h"
-	)
+	add_headerfiles("include/(jk/**.h)")
 	add_includedirs("include", {public = true})
 	add_cxxflags(
 		"cl::/Zc:preprocessor",
@@ -27,8 +22,8 @@ target("module")
 	set_kind("static")
 	set_languages("cxx20")
 	set_policy("build.c++.modules", true)
-	add_deps("kit", {public = true})
-	add_files("include/jk/jk.cppm", {public = true})
+	add_deps("kit")
+	add_files("include/jk/jk.mpp")
 
 if has_config("JK_BUILD_TESTING") then
 	includes("tests")
