@@ -17,7 +17,6 @@ target("jk")
 		set_kind("static")
 		set_languages("cxx20")
 		set_policy("build.c++.modules", true)
-		add_headerfiles("include/(jk/jk.cppm)")
 		add_files("include/jk/jk.cppm", {public = true})
 	end
 	add_includedirs("include", {public = true})
