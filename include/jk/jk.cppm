@@ -69,5 +69,7 @@ using JK::Wrap::removePrefix;
 using JK::Wrap::removeSuffix;
 using JK::Wrap::join;
 using JK::Wrap::hex;
+using JK::Wrap::lower;
+using JK::Wrap::upper;
 } // namespace Wrap
 } // namespace JK

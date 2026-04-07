@@ -148,4 +148,6 @@ using Details::Strings::removePrefix;
 using Details::Strings::removeSuffix;
 using Details::Strings::join;
 using Details::Strings::hex;
+using Details::Strings::lower;
+using Details::Strings::upper;
 } // namespace JK::Wrap
