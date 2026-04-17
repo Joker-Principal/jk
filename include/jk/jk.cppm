@@ -1,5 +1,6 @@
 module;
 #include <jk/meta/compiler.h>
+#include <jk/meta/type-var.h>
 #include <jk/meta/type-list.h>
 #include <jk/meta/callables.h>
 #include <jk/wrap/string.h>
@@ -7,16 +8,26 @@ module;
 
 export module jk;
 
+// NOLINTBEGIN(misc-unused-using-decls)
 export namespace JK
 {
 namespace Meta
 {
+// type-var.h
+using JK::Meta::TypeVar;
+using JK::Meta::typeVar;
+using JK::Meta::GetTypeArg;
+using JK::Meta::getTypeArg;
+
 // type-list.h
 using JK::Meta::TList;
-using JK::Meta::Merge;
-using JK::Meta::From;
-using JK::Meta::Zip;
-using JK::Meta::Unite;
+namespace TLists
+{
+using JK::Meta::TLists::Merge;
+using JK::Meta::TLists::From;
+using JK::Meta::TLists::Zip;
+using JK::Meta::TLists::Unite;
+}
 using JK::Meta::OneOf;
 
 // callables.h
@@ -77,3 +88,5 @@ using JK::Wrap::where;
 using JK::Wrap::Location;
 } // namespace Wrap
 } // namespace JK
+
+// NOLINTEND(misc-unused-using-decls)

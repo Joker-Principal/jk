@@ -1,6 +1,7 @@
 #pragma once
 #include <type_traits>
 #include <utility>
+#include <jk/meta/type-var.h>
 
 namespace JK::Meta::Details::TLists
 {
@@ -416,6 +417,13 @@ auto fromTrait(T<Ts...>*) -> TList<Ts...>;
 template<typename T>
 using From = decltype(fromTrait(std::add_pointer_t<std::decay_t<T>>{}));
 
+/// from vars
+template<typename... Ts>
+auto fromVarsTrait(Meta::TypeVar<Ts>...) -> TList<Ts...>;
+
+template<auto... vars>
+using FromVars = decltype(fromVarsTrait(vars...));
+
 /// zip
 template<typename... Ts> struct ZipTrait;
 
@@ -482,17 +490,23 @@ namespace JK::Meta
 {
 using Details::TLists::TList;
 
+namespace TLists
+{
 /// Merge<T1, TList<T2, T3, T4>, TList<T5, T6>> => TList<T1, T2, T3, T4, T5, T6>
 using Details::TLists::Merge;
 
 /// any_template<T1, T2, T3, ...> => TList<T1, T2, T3, ...>
 using Details::TLists::From;
 
+/// FromVars<typeVar<T1>, typeVar<T2>, typeVar<T3>, ...> => TList<T1, T2, T3, ...>
+using Details::TLists::FromVars;
+
 /// Zip<TList<T1, T2, T3>, TList<T4, T5, T6>> => TList<TList<T1, T4>, TList<T2, T5>, TList<T3, T6>>
 using Details::TLists::Zip;
 
 /// Unite<TList<T1, T2, T3>, TList<T1, T2, T4>> => TList<T1, T2, T3, T4>
 using Details::TLists::Unite;
+}
 
 /// OneOf<T, T1, T2, T3, ...> => true if T is one of T1, T2, T3, ...
 using Details::TLists::OneOf;
