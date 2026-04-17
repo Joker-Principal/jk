@@ -3,6 +3,7 @@ module;
 #include <jk/meta/type-list.h>
 #include <jk/meta/callables.h>
 #include <jk/wrap/string.h>
+#include <jk/wrap/location.h>
 
 export module jk;
 
@@ -71,5 +72,8 @@ using JK::Wrap::join;
 using JK::Wrap::hex;
 using JK::Wrap::lower;
 using JK::Wrap::upper;
+using JK::Wrap::Where;
+using JK::Wrap::where;
+using JK::Wrap::Location;
 } // namespace Wrap
 } // namespace JK
