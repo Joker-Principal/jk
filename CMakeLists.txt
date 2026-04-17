@@ -18,9 +18,11 @@ set(compile_options)
 ## meta
 list(APPEND sources 
     meta/compiler.h
+    meta/type-var.h
     meta/type-list.h
     meta/callables.h
     wrap/string.h
+    wrap/location.h
 )
 
 list(APPEND compile_options
@@ -31,6 +33,8 @@ list(APPEND compile_options
 
     # make MSVC source files be treated as UTF-8 by default
     "$<$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>:/utf-8>"
+
+    "$<$<CXX_COMPILER_ID:MSVC>:/permissive->"
 )
 
 ## add library

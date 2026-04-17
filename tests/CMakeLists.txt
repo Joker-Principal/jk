@@ -43,6 +43,7 @@ add_ctest_task(type_list type-list.cpp)
 add_ctest_task(callables callables.cpp)
 add_ctest_task(string string.cpp)
 add_ctest_task(location location.cpp)
+add_ctest_task(type_var type-var.cpp)
 
 if("test_module" IN_LIST JK_TESTS_NEED_BUILD)
 	add_executable(test_module module.cpp)
