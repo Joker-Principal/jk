@@ -68,8 +68,14 @@ struct CallableImpl
 	using Arguments = TList<Args...>;
 	using Signature = std::conditional_t<
 		!variadic,
-		R(Args...) noexcept(nothrow),
-		R(Args..., ...) noexcept(nothrow)
+		std::conditional_t<!isNothrow, 
+			R(Args...),
+			R(Args...) noexcept
+		>,
+		std::conditional_t<!isNothrow,
+			R(Args..., ...),
+			R(Args..., ...) noexcept
+		>
 	>;
 
 	template<template<typename Rx, typename... Ax> typename E>
@@ -218,7 +224,9 @@ template<typename F>
 struct CallableValueImpl
 {
 	template<bool variadic, bool nothrow, typename T, typename R, typename... Args>
-	struct Impl
+	struct Impl;
+
+	struct Base
 	{
 		using RawFunction = F;
 		using Function = std::decay_t<F>;
@@ -230,9 +238,59 @@ struct CallableValueImpl
 		template<isFunction Signature>
 		static constexpr bool isCompatibleWith = Callable::template isCompatibleWith<Signature>;
 
-		constexpr std::strong_ordering operator<=>(const Impl&) const noexcept = default;
+		constexpr auto operator<=>(const Base&) const noexcept = default;
 
 		JK_NO_UNIQUE_ADDRESS Function function;
+	};
+
+	// arguments of variadic functions can not be forwarded
+	template<bool nothrow, typename T, typename R, typename... Args>
+	struct Impl<true, nothrow, T, R, Args...> : Base {};
+
+	// c function
+	template<bool nothrow, typename R, typename... Args>
+	struct Impl<false, nothrow, void, R, Args...> : Base
+	{
+		constexpr R operator()(Args... args) const noexcept(nothrow)
+		{
+			return invoke_r<R>(Base::function, std::forward<Args>(args)...);
+		}
+	};
+
+	// member function with T& or const T&
+	template<bool nothrow, typename T, typename R, typename... Args>
+	struct Impl<false, nothrow, T&, R, Args...> : Base
+	{
+		constexpr R operator()(T& obj, Args... args) const noexcept(nothrow)
+		{
+			return invoke_r<R>(Base::function, obj, std::forward<Args>(args)...);
+		}
+	};
+
+	// member function with T&& or const T&&
+	template<bool nothrow, typename T, typename R, typename... Args>
+	struct Impl<false, nothrow, T&&, R, Args...> : Base
+	{
+		constexpr R operator()(T&& obj, Args... args) const noexcept(nothrow)
+		{
+			return invoke_r<R>(Base::function, static_cast<T&&>(obj), std::forward<Args>(args)...);
+		}
+	};
+
+	// member function T or const T
+	template<bool nothrow, typename T, typename R, typename... Args>
+	requires(!std::is_reference_v<T>)
+	struct Impl<false, nothrow, T, R, Args...> : Base
+	{
+		constexpr R operator()(T& obj, Args... args) const noexcept(nothrow)
+		{
+			return invoke_r<R>(Base::function, obj, std::forward<Args>(args)...);
+		}
+
+		constexpr R operator()(T&& obj, Args... args) const noexcept(nothrow)
+		{
+			return invoke_r<R>(Base::function, obj, std::forward<Args>(args)...);
+		}
 	};
 };
 
@@ -241,10 +299,14 @@ struct CallableValue : Callable<F>::template ExpandAll<CallableValueImpl<F>::tem
 {
 	using Base = Callable<F>::template ExpandAll<CallableValueImpl<F>::template Impl>;
 
-	constexpr CallableValue(F f) noexcept(noexcept(Base(std::forward<F>(f)))) : // CTAD
-		Base(std::forward<F>(f))
+	constexpr CallableValue(F f) 
+		noexcept(noexcept(Base{std::forward<F>(f)})) :
+		Base{std::forward<F>(f)}
 	{}
 };
+
+template<typename F>
+CallableValue(F&& f) -> CallableValue<std::decay_t<F>>;
 
 template<CallableValue v>
 struct CallableOf : decltype(v)::Callable
@@ -254,6 +316,14 @@ struct CallableOf : decltype(v)::Callable
 
 template<CallableValue v>
 inline constexpr auto fn = CallableOf<v>{};
+
+template<CallableValue v>
+auto detectCallableOf(CallableOf<v>*) -> std::true_type;
+
+template<typename T>
+concept isCallableOf = requires {
+	{ detectCallableOf(static_cast<T*>(nullptr)) } -> std::same_as<std::true_type>;
+};
 
 template<CallableValue v>
 using ReturnOf = typename CallableOf<v>::Return;
@@ -322,8 +392,28 @@ struct ArgTypedFunctor
 template<typename... Args>
 inline constexpr auto argAs = ArgTypedFunctor<Args...>{};
 
-/// GenericFunctor: wrap a final overload functor or a non-class type (e.g. function pointer)
+/// Visitor
 
+// CallableValueFunctor: wrap a CallableValue as a functor
+template<typename F>
+struct CallableValueFunctor;
+
+template<CallableValue v>
+struct CallableValueFunctor<CallableOf<v>>
+{
+	template<bool variadic, bool nothrow, typename T, typename R, typename... Args>
+	struct Impl
+	{
+		static_assert(!variadic, "arguments of variadic functions can not be forwarded");
+
+		constexpr R operator()(Args... args) const noexcept(nothrow)
+		{
+			return invoke_r<R>(v.function, std::forward<Args>(args)...);
+		}
+	};
+};
+
+// GenericFunctor: wrap a final overload functor or a non-class type (e.g. function pointer)
 template<typename F>
 struct GenericFunctor
 {
@@ -336,53 +426,78 @@ struct GenericFunctor
 
 #if __cpp_explicit_this_parameter >= 202110L
 	template<typename Self, typename... Args>
+	requires(std::is_invocable_v<ForwardLike<Self, XF>, Args...>)
 	constexpr auto operator()(this Self&& self, Args&&... args)
 		noexcept(std::is_nothrow_invocable_v<ForwardLike<Self, XF>, Args...>)
-		requires(std::is_invocable_v<ForwardLike<Self, XF>, Args...>)
 	{
 		return std::invoke(std::forward_like<Self>(self.f), std::forward<Args>(args)...);
 	}
 #else
 	template<typename... Args>
+	requires(std::is_invocable_v<XF &, Args...>)
 	constexpr decltype(auto) operator()(Args&&... args) &
 		noexcept(std::is_nothrow_invocable_v<XF &, Args...>)
-		requires(std::is_invocable_v<XF &, Args...>)
 	{
 		return std::invoke(f, std::forward<Args>(args)...);
 	}
 
 	template<typename... Args>
+	requires(std::is_invocable_v<XF const&, Args...>)
 	constexpr decltype(auto) operator()(Args&&... args) const&
 		noexcept(std::is_nothrow_invocable_v<XF const&, Args...>)
-		requires(std::is_invocable_v<XF const&, Args...>)
 	{
 		return std::invoke(f, std::forward<Args>(args)...);
 	}
 
 	template<typename... Args>
+	requires(std::is_invocable_v<XF &&, Args...>)
 	constexpr decltype(auto) operator()(Args&&... args) &&
 		noexcept(std::is_nothrow_invocable_v<XF &&, Args...>)
-		requires(std::is_invocable_v<XF &&, Args...>)
 	{
 		return std::invoke(std::move(f), std::forward<Args>(args)...);
 	}
 
 	template<typename... Args>
+	requires(std::is_invocable_v<XF const&&, Args...>)
 	constexpr decltype(auto) operator()(Args&&... args) const&&
 		noexcept(std::is_nothrow_invocable_v<XF const&&, Args...>)
-		requires(std::is_invocable_v<XF const&&, Args...>)
 	{
 		return std::invoke(std::move(f), std::forward<Args>(args)...);
 	}
 #endif
 };
 
-/// Visitor
-template<typename... Vs>
-struct Visitor : GenericFunctor<Vs>...
+template<typename F>
+struct CanUsingTrait : public F 
 {
-	constexpr Visitor(Vs&&... vs) : GenericFunctor<Vs>(std::forward<Vs>(vs))... {}
-	using GenericFunctor<Vs>::operator()...;
+	using F::F;
+	using F::operator();
+};
+
+template<typename F>
+concept canUsing = requires { sizeof(CanUsingTrait<F>); };
+
+template<typename F>
+consteval auto selectWrapper()
+{
+	if constexpr (isCallableOf<F>)
+		return typeVar<CallableValueFunctor<F>>;
+	else if constexpr (canUsing<F>)
+		return typeVar<F>;
+	else if constexpr (isCallable<F>)
+		return typeVar<CallableValue<F>>;
+	else
+		return typeVar<GenericFunctor<F>>;
+}
+
+template<typename V>
+using SelectWrapper = decltype(selectWrapper<V>())::type;
+
+template<typename... Vs>
+struct Visitor : SelectWrapper<Vs>...
+{
+	constexpr Visitor(Vs&&... vs) : SelectWrapper<Vs>(std::forward<Vs>(vs))... {}
+	using SelectWrapper<Vs>::operator()...;
 };
 
 template<typename... Vs>
@@ -478,13 +593,14 @@ struct Unbind
 			};
 		else
 			return []<typename C, typename... VArgs>(C&& obj, As... as, VArgs&&... vargs) noexcept(nothrow)  -> R {
-				return std::invoke(f, std::forward<C>(obj), std::forward<As>(as)..., std::forward<VArgs>(vargs)...);
+				return (std::forward<C>(obj).*f)(std::forward<As>(as)..., std::forward<VArgs>(vargs)...);
 			};
 	}
 };
 
-template<std::is_member_pointer memFn>
-inline constexpr auto unbind = CallableOf<memFn>::template ExpandClass<Unbind>::template impl<memFn>();
+template<auto memFn>
+requires(std::is_member_pointer_v<decltype(memFn)>)
+inline constexpr auto unbind = CallableOf<memFn>::template ExpandAll<Unbind>::template impl<memFn>();
 
 /// FunctionRef
 template<bool variadic, bool nothrow, typename, typename R, typename... Args>
@@ -559,12 +675,17 @@ public:
 
 	constexpr R operator()(Args... args) const noexcept(nothrow)
 	{
-		return func(target, std::forward<Args&&>(args)...);
+		return func(target, static_cast<Args&&>(args)...);
 	}
 
 private:
+	using Func = std::conditional_t<
+		!nothrow,
+		R(Target, Args&&...),
+		R(Target, Args&&...) noexcept
+	>;
 	Target target;
-	R(*func)(Target, Args&&...) noexcept(nothrow);
+	Func* func;
 };
 
 template<isFunction Signature>
@@ -623,23 +744,24 @@ struct UseInitializerList
 } inline constexpr useInit;
 
 /// A lazy generator that will only call the function when needed
-template<typename F, std::enable_if_t<std::is_invocable_v<F>, int> = 0>
+template<std::invocable<> F>
 class Lazy
 {
+private:
+	JK_NO_UNIQUE_ADDRESS F generator;
+	using R = std::invoke_result_t<F>;
+
 public:
 	template<typename Fi>
 	constexpr Lazy(Fi&& func) : generator(std::forward<Fi>(func)) {}
 
 	/// call generator when this object is used in a context that requires a value
-    constexpr operator decltype(auto)() noexcept(noexcept(generator())) { return generator(); }
-    constexpr operator decltype(auto)() const noexcept(noexcept(generator())) { return generator(); }
+    constexpr operator R() noexcept(noexcept(generator())) { return generator(); }
+    constexpr operator R() const noexcept(noexcept(generator())) { return generator(); }
 
 	/// explicitly call the generator to get the value
-    constexpr decltype(auto) operator()() noexcept(noexcept(generator())) { return generator(); }
-    constexpr decltype(auto) operator()() const noexcept(noexcept(generator())) { return generator(); }
-
-private:
-	JK_NO_UNIQUE_ADDRESS F generator;
+    constexpr R operator()() noexcept(noexcept(generator())) { return generator(); }
+    constexpr R operator()() const noexcept(noexcept(generator())) { return generator(); }
 };
 
 template<typename F> Lazy(F&&) -> Lazy<std::decay_t<F>>;
