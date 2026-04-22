@@ -74,6 +74,8 @@ using JK::Meta::resetCleans;
 
 namespace Wrap
 {
+using JK::Wrap::whitespace;
+using JK::Wrap::isSpace;
 using JK::Wrap::trim;
 using JK::Wrap::trimLeft;
 using JK::Wrap::trimRight;
