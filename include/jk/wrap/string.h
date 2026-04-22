@@ -9,6 +9,15 @@ using namespace std::literals;
 
 inline constexpr auto whitespace = " \f\n\r\t\v"sv;
 
+constexpr bool isSpace(char c) noexcept
+{
+#if __cpp_lib_string_contains >= 202011L
+	return whitespace.contains(c);
+#else
+	return whitespace.find(c) != std::string_view::npos;
+#endif
+}
+
 constexpr std::string_view trim(std::string_view s) noexcept
 {
     auto b = s.find_first_not_of(whitespace);
@@ -141,6 +150,8 @@ inline void upper(std::string& s) noexcept
 
 namespace JK::Wrap
 {
+using Details::Strings::whitespace;
+using Details::Strings::isSpace;
 using Details::Strings::trim;
 using Details::Strings::trimLeft;
 using Details::Strings::trimRight;
