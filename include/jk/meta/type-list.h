@@ -275,6 +275,10 @@ struct TListBase
 	template<template<typename...> typename F>
 	using To = TList<typename F<Ts>::type...>;
 
+	// template<typename...> struct F {}; => TList<F<Ts>...>
+	template<template<typename...> typename F>
+	using Map = TList<F<Ts>...>;
+
 	// F: 'std::tuple' => std::tuple<Ts...>
 	template<template<typename...> typename F>
 	using Apply = F<Ts...>;
