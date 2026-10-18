@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 project(jk 
-    VERSION 2.0.0 
+    VERSION 2.1.0
     LANGUAGES CXX
     DESCRIPTION "Joker's C++ Kit"
 )
@@ -63,7 +63,7 @@ target_compile_definitions(kit INTERFACE ${definitions})
 
 target_compile_options(kit INTERFACE ${compile_options})
 
-add_library(module)
+add_library(module STATIC)
 add_library(joker::module ALIAS module)
 
 set_target_properties(module PROPERTIES
@@ -85,6 +85,9 @@ target_link_libraries(module PUBLIC joker::kit)
 
 install(TARGETS kit module
     EXPORT jkTargets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILE_SET jk_header_set
     FILE_SET jk_module_set DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
