@@ -6,7 +6,7 @@
             "name": "base",
             "hidden": true,
             "generator": "Ninja Multi-Config",
-            "binaryDir": "${fileDir}/build/${presetName}",
+            "binaryDir": "${fileDir}/build_${presetName}",
             "cacheVariables": {
                 "CMAKE_CONFIGURATION_TYPES": "Debug;RelWithDebInfo;Release",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"

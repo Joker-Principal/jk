@@ -22,6 +22,7 @@ CMakeSettings.json
 
 # artificials
 /build/
+/build_*/
 /install/
 /out/
 __pycache__
