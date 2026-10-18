@@ -102,7 +102,7 @@ set(JK_TESTS_NEED_BUILD "" CACHE STRING
     "List of tests that need to be built. If a test is not in this list, it will be built on demand when running ctest."
 )
 
-if(BUILD_TESTING)
+if(JK_BUILD_TESTING)
 	add_subdirectory(tests)
 endif()
 
