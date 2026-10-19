@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 project(jk 
-    VERSION 2.2.0
+    VERSION 2.3.0
     LANGUAGES CXX
     DESCRIPTION "Joker's C++ Kit"
 )
@@ -8,6 +8,13 @@ project(jk
 include(GNUInstallDirs)
 include(CTest)
 include(FeatureSummary)
+
+set(JK_CXX_STANDARD "20" CACHE STRING "C++ standard used to build jk (20 or 23)")
+set_property(CACHE JK_CXX_STANDARD PROPERTY STRINGS 20 23)
+
+if(NOT JK_CXX_STANDARD MATCHES "^(20|23)$")
+    message(FATAL_ERROR "JK_CXX_STANDARD must be 20 or 23, got '${JK_CXX_STANDARD}'")
+endif()
 
 ### create target
 set(sources)
@@ -71,7 +78,7 @@ set_target_properties(module PROPERTIES
 )
 
 if(NOT CMAKE_CXX_STANDARD)
-    target_compile_features(module PUBLIC cxx_std_20)
+    target_compile_features(module PUBLIC "cxx_std_${JK_CXX_STANDARD}")
 endif()
 
 target_sources(module PUBLIC
