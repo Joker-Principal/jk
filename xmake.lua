@@ -1,5 +1,5 @@
 set_project("jk")
-set_version("2.4.0")
+set_version("2.4.1")
 set_description("Joker's C++ Kit")
 
 option("header_only")

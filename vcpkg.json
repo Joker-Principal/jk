@@ -2,9 +2,12 @@
     "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
     "name": "jk",
     "description": "Joker's C++ Kit",
-    "version": "2.4.0",
+    "version": "2.4.1",
     "license": "MIT",
     "features": {
+        "cxx23": {
+            "description": "Build and consume jk with C++23 instead of the default C++20"
+        },
         "log": {
             "description": "spdlog support",
             "dependencies": [
