@@ -83,7 +83,9 @@ add_library(joker::module ALIAS module)
 
 set_target_properties(module PROPERTIES
     CXX_EXTENSIONS OFF
+    OUTPUT_NAME jk
 )
+set_target_properties(module PROPERTIES DEBUG_POSTFIX d)
 
 if(NOT CMAKE_CXX_STANDARD)
     target_compile_features(module PUBLIC "cxx_std_${JK_CXX_STANDARD}")
