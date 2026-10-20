@@ -2,7 +2,6 @@
     "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
     "name": "jk",
     "description": "Joker's C++ Kit",
-    "version": "2.4.1",
     "license": "MIT",
     "features": {
         "cxx23": {
