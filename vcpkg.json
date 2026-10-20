@@ -21,6 +21,12 @@
                 },
                 "fmt"
             ]
+        },
+        "sqlite": {
+            "description": "sqlite3 support",
+            "dependencies": [
+                "sqlite3"
+            ]
         }
     }
 }

@@ -1,35 +1,24 @@
-# clangd
-.cache/*
-
-# clice
-.clice/*
+/.*/
+!.github/
+/build*/
+/install*/
+/out/
+__pycache__
 
 # CMake
 CMakeUserPresets.json
 
-# VS Code
-.vscode/*
-.VSCodeCounter/*
-**/.qmlls.ini
-
 # Qt Creator
+**/.qmlls.ini
 CMakeLists.txt.user*
 **.autosave
 
-# Visual Studio
-.vs/*
+# VS
 CMakeSettings.json
-
-# artificials
-/build/
-/build_*/
-/install/
-/out/
-__pycache__
 
 # vcpkg
 /buildsystem/overlays/*
 vcpkg-configuration.json
 
-# xmake
-.xmake/*
+# clice
+clice.toml

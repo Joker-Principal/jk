@@ -9,6 +9,9 @@ module;
 #   include <jk/wrap/log.h>
 #endif
 #include <jk/wrap/expected.h>
+#if JK_HAS_SQLITE
+#   include <jk/wrap/sqlite.h>
+#endif
 
 export module jk;
 
@@ -112,6 +115,17 @@ using JK::Wrap::expected;
 using JK::Wrap::unexpected;
 using JK::Wrap::bad_expected_access;
 using JK::Wrap::Result;
+
+#if JK_HAS_SQLITE
+namespace Sqlite
+{
+using JK::Wrap::Sqlite::category;
+using JK::Wrap::Sqlite::typeText;
+using JK::Wrap::Sqlite::Conn;
+using JK::Wrap::Sqlite::Stmt;
+using JK::Wrap::Sqlite::Blob;
+} // namespace Sqlite
+#endif
 } // namespace Wrap
 } // namespace JK
 

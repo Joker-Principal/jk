@@ -24,8 +24,18 @@ option("log")
 	set_default(true)
 option_end()
 
+option("sqlite")
+	set_description("enable wrap/sqlite")
+	set_showmenu(true)
+	set_default(true)
+option_end()
+
 if has_config("log") then
 	add_requires("spdlog")
+end
+
+if has_config("sqlite") then
+	add_requires("sqlite3")
 end
 
 target("jk")
@@ -43,8 +53,13 @@ target("jk")
 		add_packages("spdlog", {public = true})
 		add_defines("JK_HAS_SPDLOG=1", {public = true})
 	else
-		-- 对应 CMake：找不到 spdlog 时不安装 wrap/log.h
 		remove_headerfiles("include/jk/wrap/log.h")
+	end
+	if has_config("sqlite") then
+		add_packages("sqlite3", {public = true})
+		add_defines("JK_HAS_SQLITE=1", {public = true})
+	else
+		remove_headerfiles("include/jk/wrap/sqlite.h")
 	end
 	add_cxxflags(
 		"cl::/Zc:preprocessor",

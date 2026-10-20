@@ -9,7 +9,8 @@
             "binaryDir": "${fileDir}/build_${presetName}",
             "cacheVariables": {
                 "CMAKE_CONFIGURATION_TYPES": "Debug;RelWithDebInfo;Release",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "VCPKG_MANIFEST_FEATURES": "log;sqlite"
             }
         },
         {
@@ -17,8 +18,7 @@
             "hidden": true,
             "inherits": [ "base" ],
             "cacheVariables": {
-                "JK_BUILD_TESTING": "ON",
-                "VCPKG_MANIFEST_FEATURES": "log"
+                "JK_BUILD_TESTING": "ON"
             }
         }
     ],

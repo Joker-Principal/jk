@@ -21,3 +21,7 @@ add_ctest_task("expected", "expected.cpp")
 if has_config("log") then
 	add_ctest_task("log", "log.cpp")
 end
+
+if has_config("sqlite") then
+	add_ctest_task("sqlite", "sqlite.cpp")
+end

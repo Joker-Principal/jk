@@ -53,6 +53,22 @@ if(spdlog_FOUND)
     list(APPEND sources wrap/log.h)
 endif()
 
+## sqlite
+set(JK_SQLITE_PACKAGE "SQLite3" CACHE STRING "SQLite package to find")
+if(CMAKE_VERSION VERSION_LESS "4.3")
+    set(JK_SQLITE_LIBRARY_DEFAULT "SQLite::SQLite3")
+else()
+    set(JK_SQLITE_LIBRARY_DEFAULT "SQLite3::SQLite3")
+endif()
+set(JK_SQLITE_LIBRARY "${JK_SQLITE_LIBRARY_DEFAULT}" CACHE STRING "SQLite library to link")
+find_package("${JK_SQLITE_PACKAGE}" QUIET)
+if(${JK_SQLITE_PACKAGE}_FOUND)
+    set(JK_HAS_SQLITE ON)
+    list(APPEND link_libs "${JK_SQLITE_LIBRARY}")
+    list(APPEND definitions "JK_HAS_SQLITE=1")
+    list(APPEND sources wrap/sqlite.h)
+endif()
+
 ## add library
 set(source_paths)
 foreach(source IN LISTS sources)

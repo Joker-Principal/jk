@@ -60,3 +60,7 @@ add_ctest_task(expected expected.cpp)
 if(JK_HAS_SPDLOG)
 	add_ctest_task(log log.cpp)
 endif()
+
+if(JK_HAS_SQLITE)
+	add_ctest_task(sqlite sqlite.cpp)
+endif()
