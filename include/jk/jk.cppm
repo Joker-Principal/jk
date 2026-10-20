@@ -5,6 +5,9 @@ module;
 #include <jk/meta/callables.h>
 #include <jk/wrap/string.h>
 #include <jk/wrap/location.h>
+#if JK_HAS_SPDLOG
+#   include <jk/wrap/log.h>
+#endif
 
 export module jk;
 
@@ -88,6 +91,19 @@ using JK::Wrap::upper;
 using JK::Wrap::Where;
 using JK::Wrap::where;
 using JK::Wrap::Location;
+#if JK_HAS_SPDLOG
+namespace Logs
+{
+using JK::Wrap::Logs::active;
+using JK::Wrap::Logs::trace;
+using JK::Wrap::Logs::debug;
+using JK::Wrap::Logs::info;
+using JK::Wrap::Logs::warn;
+using JK::Wrap::Logs::err;
+using JK::Wrap::Logs::critical;
+using JK::Wrap::Logs::log;
+} // namespace Logs
+#endif
 } // namespace Wrap
 } // namespace JK
 

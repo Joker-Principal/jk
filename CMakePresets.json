@@ -17,7 +17,8 @@
             "hidden": true,
             "inherits": [ "base" ],
             "cacheVariables": {
-                "JK_BUILD_TESTING": "ON"
+                "JK_BUILD_TESTING": "ON",
+                "VCPKG_MANIFEST_FEATURES": "log"
             }
         }
     ],

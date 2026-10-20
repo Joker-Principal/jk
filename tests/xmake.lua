@@ -16,3 +16,7 @@ add_ctest_task("callables", "callables.cpp")
 add_ctest_task("string", "string.cpp")
 add_ctest_task("location", "location.cpp")
 add_ctest_task("type_var", "type-var.cpp")
+
+if has_config("log") then
+	add_ctest_task("log", "log.cpp")
+end

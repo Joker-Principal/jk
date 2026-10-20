@@ -1,5 +1,5 @@
 set_project("jk")
-set_version("2.0.0")
+set_version("2.4.0")
 set_description("Joker's C++ Kit")
 
 option("header_only")
@@ -18,6 +18,16 @@ option("tests")
 	set_showmenu(true)
 	set_default(true)
 
+option("log")
+	set_description("enable wrap/log")
+	set_showmenu(true)
+	set_default(true)
+option_end()
+
+if has_config("log") then
+	add_requires("spdlog")
+end
+
 target("jk")
 	if has_config("header_only") then
 		set_kind("headeronly")
@@ -29,6 +39,13 @@ target("jk")
 	end
 	add_includedirs("include", {public = true})
 	add_headerfiles("include/(jk/**.h)")
+	if has_config("log") then
+		add_packages("spdlog", {public = true})
+		add_defines("JK_HAS_SPDLOG=1", {public = true})
+	else
+		-- 对应 CMake：找不到 spdlog 时不安装 wrap/log.h
+		remove_headerfiles("include/jk/wrap/log.h")
+	end
 	add_cxxflags(
 		"cl::/Zc:preprocessor",
 		"cl::/utf-8",

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 project(jk 
-    VERSION 2.3.0
+    VERSION 2.4.0
     LANGUAGES CXX
     DESCRIPTION "Joker's C++ Kit"
 )
@@ -22,7 +22,6 @@ set(link_libs)
 set(definitions)
 set(compile_options)
 
-## meta
 list(APPEND sources 
     meta/compiler.h
     meta/type-var.h
@@ -43,6 +42,15 @@ list(APPEND compile_options
 
     "$<$<CXX_COMPILER_ID:MSVC>:/permissive->"
 )
+
+## log
+find_package(spdlog CONFIG QUIET)
+if(spdlog_FOUND)
+    set(JK_HAS_SPDLOG ON)
+    list(APPEND link_libs spdlog::spdlog)
+    list(APPEND definitions "JK_HAS_SPDLOG=1")
+    list(APPEND sources wrap/log.h)
+endif()
 
 ## add library
 set(source_paths)
@@ -101,10 +109,6 @@ install(TARGETS kit module
 )
 
 ### tests
-if(DEFINED JK_BUILD_TESTING)
-    set(BUILD_TESTING ${JK_BUILD_TESTING})
-endif()
-
 option(JK_BUILD_TESTING "Build jk tests" ${BUILD_TESTING})
 add_feature_info(Testing JK_BUILD_TESTING "Build jk tests")
 
