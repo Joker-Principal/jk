@@ -8,6 +8,7 @@ module;
 #if JK_HAS_SPDLOG
 #   include <jk/wrap/log.h>
 #endif
+#include <jk/wrap/expected.h>
 
 export module jk;
 
@@ -88,9 +89,11 @@ using JK::Wrap::join;
 using JK::Wrap::hex;
 using JK::Wrap::lower;
 using JK::Wrap::upper;
+
 using JK::Wrap::Where;
 using JK::Wrap::where;
 using JK::Wrap::Location;
+
 #if JK_HAS_SPDLOG
 namespace Logs
 {
@@ -104,6 +107,11 @@ using JK::Wrap::Logs::critical;
 using JK::Wrap::Logs::log;
 } // namespace Logs
 #endif
+
+using JK::Wrap::expected;
+using JK::Wrap::unexpected;
+using JK::Wrap::bad_expected_access;
+using JK::Wrap::Result;
 } // namespace Wrap
 } // namespace JK
 

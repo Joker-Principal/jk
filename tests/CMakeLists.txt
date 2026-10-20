@@ -55,6 +55,7 @@ add_ctest_task(callables callables.cpp)
 add_ctest_task(string string.cpp)
 add_ctest_task(location location.cpp)
 add_ctest_task(type_var type-var.cpp)
+add_ctest_task(expected expected.cpp)
 
 if(JK_HAS_SPDLOG)
 	add_ctest_task(log log.cpp)

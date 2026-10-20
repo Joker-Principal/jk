@@ -29,6 +29,7 @@ list(APPEND sources
     meta/callables.h
     wrap/string.h
     wrap/location.h
+    wrap/expected.h
 )
 
 list(APPEND compile_options
