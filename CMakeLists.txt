@@ -146,6 +146,7 @@ install(EXPORT jkTargets
     FILE jkTargets.cmake
     NAMESPACE joker::
     DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/jk/cmake"
+    EXPORT_PACKAGE_DEPENDENCIES
 )
 
 write_basic_package_version_file(
