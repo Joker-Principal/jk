@@ -347,15 +347,33 @@ public:
 
 public:
 	template<typename... Args>
-	Result<bool> fetch(Args&... args) noexcept
+	bool fetch(std::error_code& ec,Args&... args)
 	{
 		auto rs = step();
-		if(!rs) return unexpected(rs.error());
+		if(!rs)
+		{
+			ec = rs.error();
+			return false;
+		}
+		if(!rs.value()) return false;
 
 		auto rc = columns(args...);
-		if(!rc) return unexpected(rc.error());
+		if(!rc)
+		{
+			ec = rc.error();
+			return false;
+		}
 
-		return rs;
+		return true;
+	}
+
+	template<typename... Args>
+	Result<bool> fetch(Args&... args)
+	{
+		std::error_code ec;
+		bool result = fetch(ec, args...);
+		if(ec) return unexpected(ec);
+		return result;
 	}
 
 public:

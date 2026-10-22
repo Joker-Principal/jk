@@ -109,6 +109,25 @@ int main()
 		assert(!fetched.value());
 	}
 
+	// 循环读取：最后一次 fetch 返回 false，且不应报 SQLITE_MISMATCH
+	{
+		auto stmt = db.prepare("SELECT id FROM t ORDER BY id");
+		assert(stmt);
+
+		std::vector<long long> ids;
+		long long id = 0;
+		while(true)
+		{
+			auto more = stmt->fetch(id);
+			assert(more);
+			if(!more.value()) break;
+			ids.push_back(id);
+		}
+		assert(ids.size() == 2);
+		assert(ids[0] == 1);
+		assert(ids[1] == 2);
+	}
+
 	// 单列取值：string_view 是 sqlite 缓冲区里的视图
 	{
 		auto stmt = db.prepare("SELECT name, data FROM t WHERE id = ?");
