@@ -14,9 +14,15 @@
                     "name": "spdlog",
                     "features": [
                         "fmt",
-                        "tz-offset",
-                        "wchar"
+                        "tz-offset"
                     ]
+                },
+                {
+                    "name": "spdlog",
+                    "features": [
+                        "wchar"
+                    ],
+                    "platform": "windows"
                 },
                 "fmt"
             ]
